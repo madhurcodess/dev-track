@@ -7,6 +7,8 @@ import { NotesEditor } from './components/NotesEditor';
 import { PomodoroTimer } from './components/PomodoroTimer';
 import { AddCourseModal } from './components/AddCourseModal';
 import { LandingPage } from './components/LandingPage';
+import { PlaylistsView } from './components/PlaylistsView';
+import { CompactTimerBar } from './components/CompactTimerBar';
 import { formatTime } from './utils/youtube';
 import { SignedIn, SignedOut, useUser } from '@clerk/clerk-react';
 import { Home } from 'lucide-react';
@@ -17,6 +19,7 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ onBackToLanding }) => {
   const {
+    currentView,
     isTheaterMode,
     isSidebarOpen,
     setIsSidebarOpen,
@@ -100,17 +103,29 @@ const Dashboard: React.FC<DashboardProps> = ({ onBackToLanding }) => {
       {/* Header Bar */}
       <Header />
 
-      {/* Main 3-Panel Layout */}
-      <div className="flex-1 flex min-h-0 relative overflow-hidden">
-        {/* Left Column: Tracklist & Course index */}
-        {!isTheaterMode && <Sidebar />}
+      {/* Dynamic Content: All Playlists Hub vs. 3-Panel Learning Workspace */}
+      {currentView === 'playlists' ? (
+        <PlaylistsView />
+      ) : (
+        <div className="flex-1 flex min-h-0 relative overflow-hidden">
+          {/* Left Column: Tracklist & Course index */}
+          {!isTheaterMode && <Sidebar />}
 
-        {/* Center Workspace: Video Player & Controls */}
-        <PlayerWorkspace />
+          {/* Center Workspace: Video Player & Controls */}
+          <PlayerWorkspace />
 
-        {/* Right Column: Contextual Notes Workspace */}
-        {!isTheaterMode && <NotesEditor />}
-      </div>
+          {/* Right Column: Timer container arranged directly above Contextual Notes area */}
+          {!isTheaterMode && isNotesOpen && (
+            <section className="w-full sm:w-[380px] lg:w-[420px] xl:w-[460px] flex-shrink-0 h-full flex flex-col min-h-0 border-l border-[#121417]/10 bg-white">
+              {/* Rectangular Pomodoro Timer Container placed directly above notes */}
+              <CompactTimerBar />
+
+              {/* Single-Pane WYSIWYG Contextual Notes Editor */}
+              <NotesEditor />
+            </section>
+          )}
+        </div>
+      )}
 
       {/* Floating Pomodoro Widget / Modal */}
       <PomodoroTimer />

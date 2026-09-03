@@ -14,6 +14,7 @@ import {
   CheckCircle2, 
   Laptop 
 } from 'lucide-react';
+import { BrandLogo } from './BrandLogo';
 
 interface LandingPageProps {
   hasClerkKey: boolean;
@@ -33,14 +34,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ hasClerkKey, onEnterDe
       {/* 1. TOP NAVBAR */}
       <header className="sticky top-0 z-40 w-full border-b border-[#121417]/10 bg-[#F9F8F5]/90 backdrop-blur-md px-6 lg:px-12 h-20 flex items-center justify-between">
         {/* Logo */}
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-full bg-[#121417] text-[#EBF755] flex items-center justify-center font-black text-sm tracking-tighter">
-            DT
-          </div>
-          <span className="font-extrabold text-xl tracking-tight text-[#121417]">
-            DevTrack
-          </span>
-        </div>
+        <BrandLogo size="md" />
 
         {/* Center Nav Links */}
         <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-[#121417]/80">

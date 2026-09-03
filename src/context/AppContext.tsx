@@ -69,6 +69,14 @@ interface AppContextType {
   setIsAddModalOpen: (open: boolean) => void;
   hasClerkKey: boolean;
 
+  // View Navigation: 'playlists' (hub) or 'workspace' (3-panel player)
+  currentView: 'playlists' | 'workspace';
+  setCurrentView: (view: 'playlists' | 'workspace') => void;
+
+  // Playback Resume
+  savePlaybackPosition: (videoId: string, seconds: number) => void;
+  getPlaybackPosition: (videoId: string) => number;
+
   // Cloud Sync
   isCloudConnected: boolean;
   isCloudSyncing: boolean;
@@ -81,6 +89,7 @@ const STORAGE_KEYS = {
   NOTES: 'devtrack_notes_v2',
   POMODORO_SETTINGS: 'devtrack_pomo_settings_v2',
   POMODORO_STATS: 'devtrack_pomo_stats_v2',
+  PLAYBACK_POSITIONS: 'devtrack_playback_pos_v2',
 };
 
 const DEFAULT_POMO_SETTINGS: PomodoroSettings = {
@@ -111,6 +120,35 @@ export const AppProvider: React.FC<AppProviderProps> = ({
   userId = null
 }) => {
   const [isCloudSyncing, setIsCloudSyncing] = useState<boolean>(false);
+
+  // View Navigation: 'playlists' (hub) or 'workspace' (player & notes)
+  const [currentView, setCurrentView] = useState<'playlists' | 'workspace'>('playlists');
+
+  // Playback positions per video ID
+  const [playbackPositions, setPlaybackPositions] = useState<Record<string, number>>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.PLAYBACK_POSITIONS);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {};
+  });
+
+  const savePlaybackPosition = useCallback((videoId: string, seconds: number) => {
+    if (!videoId || seconds < 0) return;
+    setPlaybackPositions(prev => {
+      // Don't save if position change is minimal (< 2s)
+      if (Math.abs((prev[videoId] || 0) - seconds) < 2) return prev;
+      const updated = { ...prev, [videoId]: Math.floor(seconds) };
+      try {
+        localStorage.setItem(STORAGE_KEYS.PLAYBACK_POSITIONS, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  }, []);
+
+  const getPlaybackPosition = useCallback((videoId: string): number => {
+    return playbackPositions[videoId] || 0;
+  }, [playbackPositions]);
 
   // 1. Courses State - Starts clean and empty
   const [courses, setCourses] = useState<Course[]>(() => {
@@ -608,6 +646,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({
         isAddModalOpen,
         setIsAddModalOpen,
         hasClerkKey,
+        currentView,
+        setCurrentView,
+        savePlaybackPosition,
+        getPlaybackPosition,
         isCloudConnected: isSupabaseConfigured,
         isCloudSyncing,
       }}

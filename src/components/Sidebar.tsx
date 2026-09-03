@@ -13,6 +13,7 @@ import {
   ChevronDown, 
   Clock 
 } from 'lucide-react';
+import { AdBanner } from './AdBanner';
 
 export const Sidebar: React.FC = () => {
   const {
@@ -278,6 +279,11 @@ export const Sidebar: React.FC = () => {
             );
           })
         )}
+      </div>
+
+      {/* Sidebar Sponsor / Google Ad Slot */}
+      <div className="px-3 py-1 border-t border-[#121417]/10 bg-white">
+        <AdBanner slotId="sidebar-track-slot" format="sidebar" className="my-1" />
       </div>
 
       {/* Footer Track Summary */}
