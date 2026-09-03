@@ -38,8 +38,8 @@ export const Header: React.FC = () => {
     hasClerkKey,
   } = useApp();
 
-  const totalVideos = activeCourse.videos.length;
-  const completedVideos = activeCourse.videos.filter(v => v.completed).length;
+  const totalVideos = activeCourse?.videos.length || 0;
+  const completedVideos = activeCourse?.videos.filter(v => v.completed).length || 0;
   const progressPercent = totalVideos > 0 ? Math.round((completedVideos / totalVideos) * 100) : 0;
 
   const getModeColor = () => {
@@ -90,7 +90,7 @@ export const Header: React.FC = () => {
               </span>
             </div>
             <p className="text-[11px] text-slate-400 font-medium truncate max-w-[140px] sm:max-w-[200px] md:max-w-[260px]">
-              {activeCourse.title}
+              {activeCourse ? activeCourse.title : 'My Learning Track'}
             </p>
           </div>
         </div>

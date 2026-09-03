@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
@@ -6,9 +6,16 @@ import { PlayerWorkspace } from './components/PlayerWorkspace';
 import { NotesEditor } from './components/NotesEditor';
 import { PomodoroTimer } from './components/PomodoroTimer';
 import { AddCourseModal } from './components/AddCourseModal';
+import { LandingPage } from './components/LandingPage';
 import { formatTime } from './utils/youtube';
+import { SignedIn, SignedOut } from '@clerk/clerk-react';
+import { Home } from 'lucide-react';
 
-const AppContent: React.FC = () => {
+interface DashboardProps {
+  onBackToLanding?: () => void;
+}
+
+const Dashboard: React.FC<DashboardProps> = ({ onBackToLanding }) => {
   const {
     isTheaterMode,
     isSidebarOpen,
@@ -21,14 +28,13 @@ const AppContent: React.FC = () => {
     getCurrentPlayerTime,
     getNoteForCurrentVideo,
     saveNoteForCurrentVideo,
-    setIsPomodoroExpanded,
     isPomodoroExpanded,
+    setIsPomodoroExpanded,
   } = useApp();
 
   // Global Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore shortcut triggers when user is typing inside textareas or inputs
       const target = e.target as HTMLElement;
       const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
 
@@ -111,14 +117,50 @@ const AppContent: React.FC = () => {
 
       {/* Add Course / YouTube Playlist Modal */}
       <AddCourseModal />
+
+      {/* Optional Back to Landing Page button in bottom left */}
+      {onBackToLanding && (
+        <button
+          onClick={onBackToLanding}
+          className="fixed bottom-4 left-4 z-40 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 text-[11px] font-semibold text-slate-400 hover:text-white transition-all shadow-lg flex items-center gap-1.5 backdrop-blur-md"
+          title="Return to Landing Page"
+        >
+          <Home className="w-3.5 h-3.5 text-indigo-400" />
+          <span>Landing Page</span>
+        </button>
+      )}
     </div>
   );
 };
 
 export function App({ hasClerkKey = false }: { hasClerkKey?: boolean }) {
+  const [guestView, setGuestView] = useState<'landing' | 'workspace'>('landing');
+
+  // If Clerk is fully active, use Clerk's SignedIn / SignedOut routing
+  if (hasClerkKey) {
+    return (
+      <AppProvider hasClerkKey={true}>
+        <SignedOut>
+          <LandingPage hasClerkKey={true} onEnterDemo={() => {}} />
+        </SignedOut>
+        <SignedIn>
+          <Dashboard />
+        </SignedIn>
+      </AppProvider>
+    );
+  }
+
+  // Fallback demo/preview mode before Clerk key is supplied
   return (
-    <AppProvider hasClerkKey={hasClerkKey}>
-      <AppContent />
+    <AppProvider hasClerkKey={false}>
+      {guestView === 'landing' ? (
+        <LandingPage 
+          hasClerkKey={false} 
+          onEnterDemo={() => setGuestView('workspace')} 
+        />
+      ) : (
+        <Dashboard onBackToLanding={() => setGuestView('landing')} />
+      )}
     </AppProvider>
   );
 }

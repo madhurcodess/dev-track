@@ -34,6 +34,27 @@ export const Sidebar: React.FC = () => {
 
   if (!isSidebarOpen) return null;
 
+  if (!activeCourse || courses.length === 0) {
+    return (
+      <aside className="w-80 sm:w-88 flex-shrink-0 h-[calc(100vh-4rem)] flex flex-col border-r border-slate-800 bg-slate-950/60 backdrop-blur-xl p-5 items-center justify-center text-center">
+        <div className="w-12 h-12 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mb-3">
+          <FolderPlus className="w-6 h-6" />
+        </div>
+        <h3 className="text-sm font-bold text-white mb-1">No Playlists Yet</h3>
+        <p className="text-xs text-slate-400 mb-4 max-w-[220px] leading-relaxed">
+          Add any YouTube playlist or video to populate your lecture tracker and start taking notes.
+        </p>
+        <button
+          onClick={() => setIsAddModalOpen(true)}
+          className="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30 transition-all flex items-center gap-1.5"
+        >
+          <FolderPlus className="w-3.5 h-3.5" />
+          <span>+ Add Course / Playlist</span>
+        </button>
+      </aside>
+    );
+  }
+
   const filteredVideos = activeCourse.videos.filter(video => {
     const matchesSearch = video.title.toLowerCase().includes(searchQuery.toLowerCase());
     if (!matchesSearch) return false;

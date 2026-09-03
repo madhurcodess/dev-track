@@ -1,13 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { Course, VideoItem, PomodoroMode, PomodoroSettings, PomodoroStats } from '../types';
-import { PRESET_COURSES, INITIAL_NOTE_TEMPLATE } from '../data/presetCourses';
 import { soundManager } from '../utils/audio';
 import confetti from 'canvas-confetti';
 
 interface AppContextType {
   // Courses & Tracklist
   courses: Course[];
-  activeCourse: Course;
+  activeCourse: Course | null;
   activeVideo: VideoItem | undefined;
   activeCourseId: string;
   activeVideoId: string;
@@ -61,12 +60,12 @@ interface AppContextType {
 }
 
 const STORAGE_KEYS = {
-  COURSES: 'devtrack_courses_v1',
-  ACTIVE_COURSE: 'devtrack_active_course_v1',
-  ACTIVE_VIDEO: 'devtrack_active_video_v1',
-  NOTES: 'devtrack_notes_v1',
-  POMODORO_SETTINGS: 'devtrack_pomo_settings_v1',
-  POMODORO_STATS: 'devtrack_pomo_stats_v1',
+  COURSES: 'devtrack_courses_v2',
+  ACTIVE_COURSE: 'devtrack_active_course_v2',
+  ACTIVE_VIDEO: 'devtrack_active_video_v2',
+  NOTES: 'devtrack_notes_v2',
+  POMODORO_SETTINGS: 'devtrack_pomo_settings_v2',
+  POMODORO_STATS: 'devtrack_pomo_stats_v2',
 };
 
 const DEFAULT_POMO_SETTINGS: PomodoroSettings = {
@@ -89,26 +88,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode; hasClerkKey?: bo
   children, 
   hasClerkKey = false 
 }) => {
-  // 1. Courses State
+  // 1. Courses State - Starts clean and empty
   const [courses, setCourses] = useState<Course[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.COURSES);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch (e) {
       console.error('Failed to load courses from localStorage', e);
     }
-    return PRESET_COURSES;
+    return []; // Empty by default
   });
 
   const [activeCourseId, setActiveCourseIdState] = useState<string>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.ACTIVE_COURSE);
-    return saved && courses.some(c => c.id === saved) ? saved : (courses[0]?.id || 'course-java-full');
+    return saved && courses.some(c => c.id === saved) ? saved : (courses[0]?.id || '');
   });
 
-  const activeCourse = courses.find(c => c.id === activeCourseId) || courses[0] || PRESET_COURSES[0];
+  const activeCourse = courses.find(c => c.id === activeCourseId) || courses[0] || null;
 
   const [activeVideoId, setActiveVideoIdState] = useState<string>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.ACTIVE_VIDEO);
@@ -116,7 +115,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode; hasClerkKey?: bo
     return activeCourse?.videos[0]?.id || '';
   });
 
-  const activeVideo = activeCourse.videos.find(v => v.id === activeVideoId) || activeCourse.videos[0];
+  const activeVideo = activeCourse?.videos.find(v => v.id === activeVideoId) || activeCourse?.videos[0];
 
   // 2. Notes State
   const [notes, setNotes] = useState<Record<string, string>>(() => {
@@ -126,10 +125,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode; hasClerkKey?: bo
     } catch (e) {
       console.error('Failed to load notes from localStorage', e);
     }
-    // Seed initial note for Java course 1st video
-    return {
-      'course-java-full_java-1': INITIAL_NOTE_TEMPLATE,
-    };
+    return {};
   });
 
   const [isNoteSaving, setIsNoteSaving] = useState<boolean>(false);
@@ -270,32 +266,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode; hasClerkKey?: bo
   const deleteCourse = useCallback((courseId: string) => {
     setCourses(prev => {
       const remaining = prev.filter(c => c.id !== courseId);
-      if (remaining.length === 0) {
-        return PRESET_COURSES;
-      }
       return remaining;
     });
     if (activeCourseId === courseId) {
-      const next = courses.find(c => c.id !== courseId) || PRESET_COURSES[0];
-      setActiveCourseId(next.id);
+      const remaining = courses.filter(c => c.id !== courseId);
+      const next = remaining[0];
+      if (next) {
+        setActiveCourseId(next.id);
+      } else {
+        setActiveCourseIdState('');
+        setActiveVideoIdState('');
+      }
     }
   }, [activeCourseId, courses, setActiveCourseId]);
 
-  // Reset all to defaults
+  // Reset all to empty
   const resetAllData = useCallback(() => {
-    if (window.confirm('Are you sure you want to reset all courses, progress, and timer stats?')) {
+    if (window.confirm('Are you sure you want to clear your courses, progress, and timer stats?')) {
       localStorage.clear();
-      setCourses(PRESET_COURSES);
-      setActiveCourseId(PRESET_COURSES[0].id);
-      setActiveVideoId(PRESET_COURSES[0].videos[0].id);
-      setNotes({ 'course-java-full_java-1': INITIAL_NOTE_TEMPLATE });
+      setCourses([]);
+      setActiveCourseIdState('');
+      setActiveVideoIdState('');
+      setNotes({});
       setPomodoroSettings(DEFAULT_POMO_SETTINGS);
       setPomodoroStats(DEFAULT_POMO_STATS);
       setPomodoroMode('work');
       setPomodoroTimeLeft(DEFAULT_POMO_SETTINGS.workDuration * 60);
       setIsPomodoroRunning(false);
     }
-  }, [setActiveCourseId, setActiveVideoId]);
+  }, []);
 
   // Notes operations
   const currentNoteKey = `${activeCourseId}_${activeVideo?.id || ''}`;

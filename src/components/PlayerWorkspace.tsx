@@ -11,7 +11,8 @@ import {
   ExternalLink, 
   BookmarkPlus, 
   Gauge, 
-  Sparkles 
+  Sparkles,
+  FolderPlus
 } from 'lucide-react';
 
 declare global {
@@ -33,6 +34,7 @@ export const PlayerWorkspace: React.FC = () => {
     setIsTheaterMode,
     saveNoteForCurrentVideo,
     getNoteForCurrentVideo,
+    setIsAddModalOpen,
   } = useApp();
 
   const playerContainerRef = useRef<HTMLDivElement>(null);
@@ -43,9 +45,9 @@ export const PlayerWorkspace: React.FC = () => {
   const [videoDurationSec, setVideoDurationSec] = useState<number>(0);
   const [playerStatus, setPlayerStatus] = useState<'playing' | 'paused' | 'ready' | 'loading'>('loading');
 
-  const currentIndex = activeCourse.videos.findIndex(v => v.id === activeVideoId);
+  const currentIndex = activeCourse ? activeCourse.videos.findIndex(v => v.id === activeVideoId) : -1;
   const hasPrevious = currentIndex > 0;
-  const hasNext = currentIndex < activeCourse.videos.length - 1;
+  const hasNext = activeCourse ? currentIndex < activeCourse.videos.length - 1 : false;
 
   // Initialize YouTube IFrame API
   useEffect(() => {
@@ -88,7 +90,7 @@ export const PlayerWorkspace: React.FC = () => {
               setPlayerStatus('paused');
             } else if (event.data === 0) {
               // Video ended -> Auto mark completed!
-              if (activeVideo && !activeVideo.completed) {
+              if (activeVideo && !activeVideo.completed && activeCourse) {
                 toggleVideoCompletion(activeCourse.id, activeVideo.id);
               }
               setPlayerStatus('paused');
@@ -129,7 +131,7 @@ export const PlayerWorkspace: React.FC = () => {
     return () => {
       clearInterval(checkInterval);
     };
-  }, [activeVideo?.youtubeId, setYtPlayer, activeCourse.id, activeVideo, toggleVideoCompletion]);
+  }, [activeVideo?.youtubeId, setYtPlayer, activeCourse?.id, activeVideo, toggleVideoCompletion]);
 
   // Load new video when activeVideo changes
   useEffect(() => {
@@ -141,13 +143,13 @@ export const PlayerWorkspace: React.FC = () => {
   }, [activeVideo?.youtubeId]);
 
   const handlePrevious = () => {
-    if (hasPrevious) {
+    if (hasPrevious && activeCourse) {
       setActiveVideoId(activeCourse.videos[currentIndex - 1].id);
     }
   };
 
   const handleNext = () => {
-    if (hasNext) {
+    if (hasNext && activeCourse) {
       setActiveVideoId(activeCourse.videos[currentIndex + 1].id);
     }
   };
@@ -172,11 +174,46 @@ export const PlayerWorkspace: React.FC = () => {
     saveNoteForCurrentVideo(existing + tag);
   }, [getNoteForCurrentVideo, saveNoteForCurrentVideo]);
 
-  if (!activeVideo) {
+  if (!activeCourse || !activeVideo) {
     return (
-      <div className="flex-1 flex items-center justify-center p-8 text-center text-slate-400">
-        <p>No video selected. Select a lecture from the sidebar to begin.</p>
-      </div>
+      <main className="flex-1 flex flex-col items-center justify-center p-6 text-center bg-slate-950/40">
+        <div className="max-w-md p-8 rounded-3xl bg-slate-900/60 border border-slate-800/80 shadow-2xl backdrop-blur-xl flex flex-col items-center">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-600/30 to-purple-600/30 border border-indigo-500/30 text-indigo-400 flex items-center justify-center mb-5 shadow-lg shadow-indigo-500/10">
+            <FolderPlus className="w-8 h-8" />
+          </div>
+
+          <h2 className="text-xl font-bold text-white mb-2 tracking-tight">
+            Ready to Start Learning?
+          </h2>
+
+          <p className="text-xs text-slate-400 mb-6 leading-relaxed">
+            Your learning workspace is clean and ready. Add any YouTube playlist or video link to track lectures, take timestamped notes, and build your daily study streak.
+          </p>
+
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="px-6 py-3 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-xl shadow-indigo-600/30 transition-all flex items-center gap-2 hover:scale-[1.02] active:scale-95"
+          >
+            <FolderPlus className="w-4 h-4" />
+            <span>+ Add Your First Playlist / Course</span>
+          </button>
+
+          <div className="mt-6 pt-5 border-t border-slate-800/60 w-full grid grid-cols-3 gap-2 text-[10px] text-slate-500">
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-indigo-400 font-bold">1. Paste URL</span>
+              <span>Any YouTube playlist</span>
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-purple-400 font-bold">2. Focus</span>
+              <span>Pomodoro timer</span>
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-emerald-400 font-bold">3. Notes</span>
+              <span>Clickable timestamps</span>
+            </div>
+          </div>
+        </div>
+      </main>
     );
   }
 

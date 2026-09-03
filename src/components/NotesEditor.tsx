@@ -118,7 +118,8 @@ export const NotesEditor: React.FC = () => {
 
   // Export as .md
   const handleExportMarkdown = () => {
-    const filename = `${activeCourse.title} - ${activeVideo?.title || 'Notes'}.md`.replace(/[/\\?%*:|"<>]/g, '-');
+    const courseTitle = activeCourse?.title || 'Course';
+    const filename = `${courseTitle} - ${activeVideo?.title || 'Notes'}.md`.replace(/[/\\?%*:|"<>]/g, '-');
     const blob = new Blob([content], { type: 'text/markdown;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -130,7 +131,8 @@ export const NotesEditor: React.FC = () => {
 
   // Export as .txt
   const handleExportText = () => {
-    const filename = `${activeCourse.title} - ${activeVideo?.title || 'Notes'}.txt`.replace(/[/\\?%*:|"<>]/g, '-');
+    const courseTitle = activeCourse?.title || 'Course';
+    const filename = `${courseTitle} - ${activeVideo?.title || 'Notes'}.txt`.replace(/[/\\?%*:|"<>]/g, '-');
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -141,6 +143,20 @@ export const NotesEditor: React.FC = () => {
   };
 
   if (!isNotesOpen) return null;
+
+  if (!activeVideo) {
+    return (
+      <section className="w-full lg:w-[450px] xl:w-[500px] flex-shrink-0 h-[calc(100vh-4rem)] flex flex-col border-l border-slate-800 bg-slate-950/70 backdrop-blur-xl p-8 items-center justify-center text-center">
+        <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 text-slate-500 flex items-center justify-center mb-3">
+          <Edit3 className="w-6 h-6" />
+        </div>
+        <h3 className="text-sm font-bold text-slate-300 mb-1">Notes Workspace</h3>
+        <p className="text-xs text-slate-500 max-w-[220px]">
+          Add a course and select a lecture to start taking timestamped notes and code snippets.
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section className="w-full lg:w-[450px] xl:w-[500px] flex-shrink-0 h-[calc(100vh-4rem)] flex flex-col border-l border-slate-800 bg-slate-950/70 backdrop-blur-xl">
