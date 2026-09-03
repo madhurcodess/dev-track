@@ -96,7 +96,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onBackToLanding }) => {
   ]);
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#090d16] text-slate-100 font-sans selection:bg-indigo-500/30 selection:text-indigo-200">
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#F9F8F5] text-[#121417] font-sans selection:bg-[#EBF755] selection:text-black">
       {/* Header Bar */}
       <Header />
 
@@ -122,10 +122,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onBackToLanding }) => {
       {onBackToLanding && (
         <button
           onClick={onBackToLanding}
-          className="fixed bottom-4 left-4 z-40 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 text-[11px] font-semibold text-slate-400 hover:text-white transition-all shadow-lg flex items-center gap-1.5 backdrop-blur-md"
+          className="fixed bottom-4 left-4 z-40 px-4 py-2 rounded-full bg-white hover:bg-slate-50 border-2 border-[#121417] text-xs font-bold text-[#121417] transition-all shadow-solid flex items-center gap-2 hover:scale-105"
           title="Return to Landing Page"
         >
-          <Home className="w-3.5 h-3.5 text-indigo-400" />
+          <Home className="w-3.5 h-3.5 text-[#121417]" />
           <span>Landing Page</span>
         </button>
       )}

@@ -83,7 +83,6 @@ export const PlayerWorkspace: React.FC = () => {
             } catch {}
           },
           onStateChange: (event: any) => {
-            // YT.PlayerState: -1 unstarted, 0 ended, 1 playing, 2 paused, 3 buffering, 5 video cued
             if (event.data === 1) {
               setPlayerStatus('playing');
             } else if (event.data === 2) {
@@ -176,39 +175,39 @@ export const PlayerWorkspace: React.FC = () => {
 
   if (!activeCourse || !activeVideo) {
     return (
-      <main className="flex-1 flex flex-col items-center justify-center p-6 text-center bg-slate-950/40">
-        <div className="max-w-md p-8 rounded-3xl bg-slate-900/60 border border-slate-800/80 shadow-2xl backdrop-blur-xl flex flex-col items-center">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-600/30 to-purple-600/30 border border-indigo-500/30 text-indigo-400 flex items-center justify-center mb-5 shadow-lg shadow-indigo-500/10">
+      <main className="flex-1 flex flex-col items-center justify-center p-6 text-center bg-[#F9F8F5]">
+        <div className="max-w-md p-8 rounded-3xl bg-white border-2 border-[#121417] shadow-solid-lg flex flex-col items-center">
+          <div className="w-16 h-16 rounded-2xl bg-[#EBF755] border-2 border-[#121417] text-[#121417] flex items-center justify-center mb-5 shadow-solid">
             <FolderPlus className="w-8 h-8" />
           </div>
 
-          <h2 className="text-xl font-bold text-white mb-2 tracking-tight">
+          <h2 className="text-xl font-extrabold text-[#121417] mb-2 tracking-tight">
             Ready to Start Learning?
           </h2>
 
-          <p className="text-xs text-slate-400 mb-6 leading-relaxed">
+          <p className="text-xs text-[#121417]/70 mb-6 leading-relaxed font-medium">
             Your learning workspace is clean and ready. Add any YouTube playlist or video link to track lectures, take timestamped notes, and build your daily study streak.
           </p>
 
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="px-6 py-3 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-xl shadow-indigo-600/30 transition-all flex items-center gap-2 hover:scale-[1.02] active:scale-95"
+            className="px-6 py-3 rounded-full text-xs font-bold text-[#121417] bg-[#D4E4FC] hover:bg-[#C2DBFB] border-2 border-[#121417] shadow-solid transition-all hover:scale-105 active:scale-95 flex items-center gap-2"
           >
             <FolderPlus className="w-4 h-4" />
             <span>+ Add Your First Playlist / Course</span>
           </button>
 
-          <div className="mt-6 pt-5 border-t border-slate-800/60 w-full grid grid-cols-3 gap-2 text-[10px] text-slate-500">
+          <div className="mt-8 pt-5 border-t border-[#121417]/10 w-full grid grid-cols-3 gap-2 text-[10px] text-[#121417]/60 font-bold">
             <div className="flex flex-col items-center gap-1">
-              <span className="text-indigo-400 font-bold">1. Paste URL</span>
+              <span className="text-[#121417] font-extrabold">1. Paste URL</span>
               <span>Any YouTube playlist</span>
             </div>
             <div className="flex flex-col items-center gap-1">
-              <span className="text-purple-400 font-bold">2. Focus</span>
+              <span className="text-[#121417] font-extrabold">2. Focus</span>
               <span>Pomodoro timer</span>
             </div>
             <div className="flex flex-col items-center gap-1">
-              <span className="text-emerald-400 font-bold">3. Notes</span>
+              <span className="text-[#121417] font-extrabold">3. Notes</span>
               <span>Clickable timestamps</span>
             </div>
           </div>
@@ -218,47 +217,47 @@ export const PlayerWorkspace: React.FC = () => {
   }
 
   return (
-    <main className="flex-1 flex flex-col min-w-0 bg-slate-950/40 overflow-y-auto">
+    <main className="flex-1 flex flex-col min-w-0 bg-[#F9F8F5] overflow-y-auto">
       {/* Player Container */}
-      <div className="p-3 sm:p-5 lg:p-6 pb-2 max-w-6xl w-full mx-auto">
+      <div className="p-4 sm:p-6 lg:p-8 pb-2 max-w-6xl w-full mx-auto">
         {/* 16:9 Responsive Video Aspect Ratio */}
-        <div className="relative w-full rounded-2xl overflow-hidden shadow-2xl shadow-black/80 border border-slate-800/80 bg-black aspect-video group">
+        <div className="relative w-full rounded-3xl overflow-hidden shadow-solid-lg border-2 border-[#121417] bg-black aspect-video group">
           <div id="youtube-player-element" ref={playerContainerRef} className="w-full h-full" />
         </div>
 
         {/* Video Information & Action Controls */}
-        <div className="mt-4 p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-md">
+        <div className="mt-5 p-5 rounded-3xl bg-white border-2 border-[#121417] shadow-solid">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             {/* Title & Metadata */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-[#D4E4FC] text-[#121417] border border-[#121417]/15">
                   Lecture {currentIndex + 1} of {activeCourse.videos.length}
                 </span>
-                <span className="flex items-center gap-1.5 text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-slate-400">
+                <span className="flex items-center gap-1.5 text-[10px] uppercase font-mono px-2.5 py-0.5 rounded-full bg-[#F9F8F5] border border-[#121417]/15 text-[#121417]/70 font-bold">
                   <span className={`w-1.5 h-1.5 rounded-full ${
-                    playerStatus === 'playing' ? 'bg-emerald-400 animate-ping' : playerStatus === 'paused' ? 'bg-amber-400' : 'bg-slate-500'
+                    playerStatus === 'playing' ? 'bg-emerald-500 animate-ping' : playerStatus === 'paused' ? 'bg-amber-500' : 'bg-slate-400'
                   }`} />
                   {playerStatus}
                 </span>
                 {videoDurationSec > 0 && (
-                  <span className="flex items-center gap-1 text-[11px] text-slate-400 font-mono">
+                  <span className="flex items-center gap-1 text-[11px] text-[#121417]/70 font-mono font-bold">
                     <Clock className="w-3 h-3" />
                     <span>{formatTime(currentTimeSec)} / {formatTime(videoDurationSec)}</span>
                   </span>
                 )}
                 {activeVideo.completed && (
-                  <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                  <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300">
                     <Sparkles className="w-3 h-3" /> Completed
                   </span>
                 )}
               </div>
 
-              <h1 className="text-base sm:text-lg font-bold text-white tracking-tight leading-snug">
+              <h1 className="text-base sm:text-lg font-extrabold text-[#121417] tracking-tight leading-snug">
                 {activeVideo.title}
               </h1>
-              <p className="text-xs text-slate-400 mt-1">
-                Course: <span className="text-slate-300 font-medium">{activeCourse.title}</span>
+              <p className="text-xs text-[#121417]/60 mt-1 font-bold">
+                Course: <span className="text-[#121417]">{activeCourse.title}</span>
               </p>
             </div>
 
@@ -267,7 +266,7 @@ export const PlayerWorkspace: React.FC = () => {
               {/* Timestamp Note Quick Button */}
               <button
                 onClick={handleQuickTimestampNote}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/30 transition-all active:scale-95"
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-[#D4E4FC] hover:bg-[#C2DBFB] text-[#121417] text-xs font-bold border-2 border-[#121417] shadow-sm transition-all hover:scale-105 active:scale-95"
                 title="Insert current video timestamp into notes"
               >
                 <BookmarkPlus className="w-4 h-4" />
@@ -277,28 +276,28 @@ export const PlayerWorkspace: React.FC = () => {
               {/* Mark Completed */}
               <button
                 onClick={() => toggleVideoCompletion(activeCourse.id, activeVideo.id)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
+                className={`flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-bold border-2 border-[#121417] transition-all hover:scale-105 ${
                   activeVideo.completed
-                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25'
-                    : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700/80'
+                    ? 'bg-[#EBF755] text-black shadow-solid'
+                    : 'bg-white text-[#121417] hover:bg-slate-50'
                 }`}
               >
                 <CheckCircle2 className="w-4 h-4" />
-                <span className="hidden sm:inline">{activeVideo.completed ? 'Completed' : 'Mark as Done'}</span>
+                <span>{activeVideo.completed ? 'Completed' : 'Mark as Done'}</span>
               </button>
             </div>
           </div>
 
           {/* Secondary Control Bar: Previous / Next / Speed / Theater / YouTube Link */}
-          <div className="mt-3.5 pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2 flex-wrap">
+          <div className="mt-4 pt-3.5 border-t border-[#121417]/10 flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2">
               <button
                 onClick={handlePrevious}
                 disabled={!hasPrevious}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold border transition-colors ${
                   hasPrevious
-                    ? 'bg-slate-800/60 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800'
-                    : 'opacity-40 cursor-not-allowed border-slate-800 text-slate-600'
+                    ? 'bg-white border-[#121417]/30 text-[#121417] hover:bg-slate-100'
+                    : 'opacity-40 cursor-not-allowed border-slate-200 text-slate-400'
                 }`}
               >
                 <SkipBack className="w-3.5 h-3.5" />
@@ -308,10 +307,10 @@ export const PlayerWorkspace: React.FC = () => {
               <button
                 onClick={handleNext}
                 disabled={!hasNext}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold border transition-colors ${
                   hasNext
-                    ? 'bg-slate-800/60 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800'
-                    : 'opacity-40 cursor-not-allowed border-slate-800 text-slate-600'
+                    ? 'bg-white border-[#121417]/30 text-[#121417] hover:bg-slate-100'
+                    : 'opacity-40 cursor-not-allowed border-slate-200 text-slate-400'
                 }`}
               >
                 <span>Next</span>
@@ -324,22 +323,22 @@ export const PlayerWorkspace: React.FC = () => {
               <div className="relative">
                 <button
                   onClick={() => setIsRateMenuOpen(!isRateMenuOpen)}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-slate-700 text-slate-300 text-xs font-mono font-medium transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white hover:bg-slate-50 border border-[#121417]/30 text-[#121417] text-xs font-mono font-bold transition-colors"
                 >
-                  <Gauge className="w-3.5 h-3.5 text-indigo-400" />
+                  <Gauge className="w-3.5 h-3.5 text-[#121417]" />
                   <span>{playbackRate}x</span>
                 </button>
 
                 {isRateMenuOpen && (
-                  <div className="absolute bottom-full mb-1 right-0 bg-slate-900 border border-slate-800 rounded-lg shadow-xl p-1 z-50 flex flex-col gap-0.5 min-w-[70px]">
+                  <div className="absolute bottom-full mb-2 right-0 bg-white border-2 border-[#121417] rounded-2xl shadow-solid p-1.5 z-50 flex flex-col gap-1 min-w-[80px]">
                     {[0.75, 1, 1.25, 1.5, 1.75, 2].map(rate => (
                       <button
                         key={rate}
                         onClick={() => handlePlaybackRate(rate)}
-                        className={`px-2 py-1 text-xs rounded text-center transition-colors font-mono ${
+                        className={`px-2.5 py-1 text-xs rounded-xl text-center transition-colors font-mono font-bold ${
                           playbackRate === rate
-                            ? 'bg-indigo-600 text-white'
-                            : 'text-slate-300 hover:bg-slate-800'
+                            ? 'bg-[#EBF755] text-black font-extrabold'
+                            : 'text-[#121417] hover:bg-slate-100'
                         }`}
                       >
                         {rate}x
@@ -352,7 +351,7 @@ export const PlayerWorkspace: React.FC = () => {
               {/* Theater Mode Toggle */}
               <button
                 onClick={() => setIsTheaterMode(!isTheaterMode)}
-                className="p-1.5 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition-colors"
+                className="p-2 rounded-full bg-white hover:bg-slate-50 border border-[#121417]/30 text-[#121417] transition-colors"
                 title={isTheaterMode ? "Exit Theater Mode" : "Enter Theater Mode"}
               >
                 {isTheaterMode ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
@@ -363,7 +362,7 @@ export const PlayerWorkspace: React.FC = () => {
                 href={`https://www.youtube.com/watch?v=${activeVideo.youtubeId}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-1.5 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition-colors"
+                className="p-2 rounded-full bg-white hover:bg-slate-50 border border-[#121417]/30 text-[#121417] transition-colors"
                 title="Watch directly on YouTube"
               >
                 <ExternalLink className="w-4 h-4" />

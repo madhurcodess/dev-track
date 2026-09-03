@@ -36,19 +36,19 @@ export const Sidebar: React.FC = () => {
 
   if (!activeCourse || courses.length === 0) {
     return (
-      <aside className="w-80 sm:w-88 flex-shrink-0 h-[calc(100vh-4rem)] flex flex-col border-r border-slate-800 bg-slate-950/60 backdrop-blur-xl p-5 items-center justify-center text-center">
-        <div className="w-12 h-12 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mb-3">
-          <FolderPlus className="w-6 h-6" />
+      <aside className="w-80 sm:w-88 flex-shrink-0 h-[calc(100vh-4rem)] flex flex-col border-r border-[#121417]/10 bg-white p-6 items-center justify-center text-center">
+        <div className="w-14 h-14 rounded-2xl bg-[#EBF755] border-2 border-[#121417] text-[#121417] flex items-center justify-center mb-4 shadow-solid">
+          <FolderPlus className="w-7 h-7" />
         </div>
-        <h3 className="text-sm font-bold text-white mb-1">No Playlists Yet</h3>
-        <p className="text-xs text-slate-400 mb-4 max-w-[220px] leading-relaxed">
+        <h3 className="text-base font-extrabold text-[#121417] mb-1.5">No Playlists Yet</h3>
+        <p className="text-xs text-[#121417]/70 mb-5 max-w-[220px] leading-relaxed font-medium">
           Add any YouTube playlist or video to populate your lecture tracker and start taking notes.
         </p>
         <button
           onClick={() => setIsAddModalOpen(true)}
-          className="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30 transition-all flex items-center gap-1.5"
+          className="px-5 py-2.5 rounded-full text-xs font-bold bg-[#D4E4FC] hover:bg-[#C2DBFB] text-[#121417] border border-[#121417]/20 shadow-sm transition-all hover:scale-105 flex items-center gap-1.5"
         >
-          <FolderPlus className="w-3.5 h-3.5" />
+          <FolderPlus className="w-4 h-4" />
           <span>+ Add Course / Playlist</span>
         </button>
       </aside>
@@ -68,38 +68,38 @@ export const Sidebar: React.FC = () => {
   const progressPercent = totalVideos > 0 ? Math.round((completedVideos / totalVideos) * 100) : 0;
 
   return (
-    <aside className="w-80 sm:w-88 flex-shrink-0 h-[calc(100vh-4rem)] flex flex-col border-r border-slate-800 bg-slate-950/60 backdrop-blur-xl">
+    <aside className="w-80 sm:w-88 flex-shrink-0 h-[calc(100vh-4rem)] flex flex-col border-r border-[#121417]/10 bg-white">
       {/* Course Selector Dropdown */}
-      <div className="p-3.5 border-b border-slate-800/80">
-        <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5 block">
-          Current Course
+      <div className="p-4 border-b border-[#121417]/10 bg-[#F9F8F5]/50">
+        <label className="text-[11px] font-bold uppercase tracking-wider text-[#121417]/60 mb-1.5 block">
+          Current Playlist
         </label>
         <div className="relative">
           <button
             onClick={() => setIsCourseDropdownOpen(!isCourseDropdownOpen)}
-            className="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 transition-all text-left group"
+            className="w-full flex items-center justify-between p-3 rounded-2xl bg-white hover:bg-slate-50 border-2 border-[#121417] shadow-sm transition-all text-left group"
           >
             <div className="flex items-center gap-2.5 truncate">
-              <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 group-hover:scale-105 transition-transform flex-shrink-0">
+              <div className="w-8 h-8 rounded-xl bg-[#EBF755] border border-[#121417] flex items-center justify-center text-[#121417] flex-shrink-0">
                 <BookOpen className="w-4 h-4" />
               </div>
               <div className="truncate">
-                <p className="text-xs font-semibold text-slate-200 truncate group-hover:text-white">
+                <p className="text-xs font-extrabold text-[#121417] truncate">
                   {activeCourse.title}
                 </p>
-                <p className="text-[10px] text-slate-400">
+                <p className="text-[10px] text-[#121417]/60 font-bold">
                   {completedVideos}/{totalVideos} completed ({progressPercent}%)
                 </p>
               </div>
             </div>
-            <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ml-1.5 ${isCourseDropdownOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-4 h-4 text-[#121417]/70 transition-transform flex-shrink-0 ml-1.5 ${isCourseDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
 
           {/* Dropdown menu */}
           {isCourseDropdownOpen && (
-            <div className="absolute top-full left-0 right-0 mt-1.5 py-1.5 bg-slate-900/95 border border-slate-800 rounded-xl shadow-2xl backdrop-blur-xl z-50 animate-fade-in max-h-72 overflow-y-auto">
-              <div className="px-3 py-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                Switch Course
+            <div className="absolute top-full left-0 right-0 mt-2 py-2 bg-white border-2 border-[#121417] rounded-2xl shadow-solid-lg z-50 animate-fade-in max-h-72 overflow-y-auto">
+              <div className="px-3 py-1.5 text-[10px] font-bold text-[#121417]/50 uppercase tracking-wider">
+                Switch Playlist
               </div>
               {courses.map(course => {
                 const isCurrent = course.id === activeCourse.id;
@@ -109,8 +109,8 @@ export const Sidebar: React.FC = () => {
                     key={course.id}
                     className={`flex items-center justify-between px-3 py-2 text-xs cursor-pointer transition-colors ${
                       isCurrent
-                        ? 'bg-indigo-500/15 text-indigo-300 font-medium'
-                        : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                        ? 'bg-[#EBF755] text-black font-bold'
+                        : 'text-[#121417] hover:bg-slate-100'
                     }`}
                     onClick={() => {
                       setActiveCourseId(course.id);
@@ -118,8 +118,8 @@ export const Sidebar: React.FC = () => {
                     }}
                   >
                     <div className="truncate pr-2">
-                      <div className="truncate font-medium">{course.title}</div>
-                      <div className="text-[10px] text-slate-400">
+                      <div className="truncate font-extrabold">{course.title}</div>
+                      <div className="text-[10px] text-[#121417]/60">
                         {doneCount}/{course.videos.length} completed
                       </div>
                     </div>
@@ -131,7 +131,7 @@ export const Sidebar: React.FC = () => {
                             deleteCourse(course.id);
                           }
                         }}
-                        className="opacity-0 group-hover:opacity-100 hover:opacity-100 p-1 text-slate-400 hover:text-rose-400 rounded transition-opacity"
+                        className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors"
                         title="Delete course"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -141,13 +141,13 @@ export const Sidebar: React.FC = () => {
                 );
               })}
 
-              <div className="border-t border-slate-800 my-1"></div>
+              <div className="border-t border-slate-200 my-1"></div>
               <button
                 onClick={() => {
                   setIsCourseDropdownOpen(false);
                   setIsAddModalOpen(true);
                 }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 transition-colors"
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-[#121417] hover:bg-[#EBF755] transition-colors"
               >
                 <FolderPlus className="w-4 h-4" />
                 <span>+ Add / Import New Playlist</span>
@@ -158,7 +158,7 @@ export const Sidebar: React.FC = () => {
       </div>
 
       {/* Tracklist Controls & Search */}
-      <div className="p-3.5 space-y-2.5 border-b border-slate-800/80">
+      <div className="p-3.5 space-y-2.5 border-b border-[#121417]/10">
         {/* Search input */}
         <div className="relative">
           <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -167,33 +167,33 @@ export const Sidebar: React.FC = () => {
             placeholder="Search lectures..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-slate-900/90 text-slate-200 placeholder-slate-500 text-xs pl-8 pr-3 py-1.5 rounded-lg border border-slate-800 focus:outline-none focus:border-indigo-500 transition-colors"
+            className="w-full bg-[#F9F8F5] text-[#121417] placeholder-slate-400 text-xs pl-8 pr-3 py-2 rounded-xl border border-[#121417]/15 focus:outline-none focus:ring-2 focus:ring-[#EBF755] transition-colors"
           />
         </div>
 
         {/* Filter Pills */}
         <div className="flex items-center justify-between gap-1 text-[11px]">
-          <div className="flex gap-1 bg-slate-900 p-0.5 rounded-lg border border-slate-800">
+          <div className="flex gap-1 bg-[#F9F8F5] p-1 rounded-full border border-[#121417]/10">
             <button
               onClick={() => setFilterMode('all')}
-              className={`px-2 py-0.5 rounded-md font-medium transition-all ${
-                filterMode === 'all' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+              className={`px-2.5 py-0.5 rounded-full font-bold transition-all ${
+                filterMode === 'all' ? 'bg-[#121417] text-[#EBF755] shadow-sm' : 'text-[#121417]/60 hover:text-[#121417]'
               }`}
             >
               All ({activeCourse.videos.length})
             </button>
             <button
               onClick={() => setFilterMode('pending')}
-              className={`px-2 py-0.5 rounded-md font-medium transition-all ${
-                filterMode === 'pending' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+              className={`px-2.5 py-0.5 rounded-full font-bold transition-all ${
+                filterMode === 'pending' ? 'bg-[#121417] text-[#EBF755] shadow-sm' : 'text-[#121417]/60 hover:text-[#121417]'
               }`}
             >
               Remaining ({totalVideos - completedVideos})
             </button>
             <button
               onClick={() => setFilterMode('completed')}
-              className={`px-2 py-0.5 rounded-md font-medium transition-all ${
-                filterMode === 'completed' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+              className={`px-2.5 py-0.5 rounded-full font-bold transition-all ${
+                filterMode === 'completed' ? 'bg-[#121417] text-[#EBF755] shadow-sm' : 'text-[#121417]/60 hover:text-[#121417]'
               }`}
             >
               Done ({completedVideos})
@@ -202,7 +202,7 @@ export const Sidebar: React.FC = () => {
 
           <button
             onClick={() => markCourseCompleted(activeCourse.id, completedVideos !== totalVideos)}
-            className="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-slate-800/80 rounded-lg transition-colors"
+            className="p-1.5 text-slate-500 hover:text-black hover:bg-slate-100 rounded-full transition-colors"
             title={completedVideos === totalVideos ? "Mark all uncompleted" : "Mark all completed"}
           >
             <CheckCheck className="w-4 h-4" />
@@ -211,10 +211,10 @@ export const Sidebar: React.FC = () => {
       </div>
 
       {/* Videos List */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-1">
+      <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
         {filteredVideos.length === 0 ? (
           <div className="text-center py-10 px-4">
-            <p className="text-xs text-slate-400">No videos match your filter.</p>
+            <p className="text-xs text-slate-400 font-medium">No videos match your filter.</p>
           </div>
         ) : (
           filteredVideos.map((video) => {
@@ -223,10 +223,10 @@ export const Sidebar: React.FC = () => {
               <div
                 key={video.id}
                 onClick={() => setActiveVideoId(video.id)}
-                className={`group flex items-start gap-2.5 p-2.5 rounded-xl cursor-pointer transition-all duration-150 ${
+                className={`group flex items-start gap-2.5 p-3 rounded-2xl cursor-pointer transition-all duration-150 ${
                   isActive
-                    ? 'bg-indigo-600/15 border border-indigo-500/30 text-white shadow-sm shadow-indigo-500/10'
-                    : 'text-slate-300 hover:bg-slate-900 hover:text-slate-100 border border-transparent'
+                    ? 'bg-[#EBF755] border-2 border-[#121417] shadow-solid text-black'
+                    : 'text-[#121417] hover:bg-slate-50 border border-transparent'
                 }`}
               >
                 {/* Completion Checkbox */}
@@ -235,13 +235,13 @@ export const Sidebar: React.FC = () => {
                     e.stopPropagation();
                     toggleVideoCompletion(activeCourse.id, video.id);
                   }}
-                  className="mt-0.5 text-slate-500 hover:text-indigo-400 transition-colors flex-shrink-0"
+                  className="mt-0.5 text-slate-400 hover:text-black transition-colors flex-shrink-0"
                   title={video.completed ? "Mark as in-progress" : "Mark as completed"}
                 >
                   {video.completed ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 fill-emerald-400/20" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 fill-emerald-100" />
                   ) : (
-                    <Circle className="w-4 h-4 text-slate-600 group-hover:text-slate-400" />
+                    <Circle className="w-4 h-4 text-slate-400 group-hover:text-slate-600" />
                   )}
                 </button>
 
@@ -249,28 +249,28 @@ export const Sidebar: React.FC = () => {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
                     {isActive && (
-                      <span className="flex-shrink-0 flex items-center justify-center w-3.5 h-3.5 rounded-full bg-indigo-500 text-white">
+                      <span className="flex-shrink-0 flex items-center justify-center w-3.5 h-3.5 rounded-full bg-black text-[#EBF755]">
                         <Play className="w-2 h-2 fill-current ml-0.2" />
                       </span>
                     )}
                     <h4
-                      className={`text-xs font-medium leading-snug line-clamp-2 ${
-                        video.completed ? 'text-slate-400 line-through decoration-slate-600' : ''
-                      } ${isActive ? 'text-indigo-200 font-semibold' : ''}`}
+                      className={`text-xs font-bold leading-snug line-clamp-2 ${
+                        video.completed ? 'text-[#121417]/50 line-through' : ''
+                      } ${isActive ? 'text-black' : 'text-[#121417]'}`}
                     >
                       {video.title}
                     </h4>
                   </div>
 
-                  <div className="flex items-center gap-2 mt-1.5 text-[10px] text-slate-400">
+                  <div className="flex items-center gap-2 mt-1.5 text-[10px] text-[#121417]/60 font-semibold">
                     {video.duration && (
-                      <span className="flex items-center gap-1 bg-slate-900/80 px-1.5 py-0.5 rounded border border-slate-800/80 font-mono">
+                      <span className="flex items-center gap-1 bg-white/70 px-2 py-0.5 rounded-full border border-[#121417]/10 font-mono">
                         <Clock className="w-2.5 h-2.5" />
                         {video.duration}
                       </span>
                     )}
                     {video.completed && (
-                      <span className="text-emerald-400 font-medium">Completed</span>
+                      <span className="text-emerald-700 font-bold">Completed</span>
                     )}
                   </div>
                 </div>
@@ -281,12 +281,12 @@ export const Sidebar: React.FC = () => {
       </div>
 
       {/* Footer Track Summary */}
-      <div className="p-3 border-t border-slate-800 bg-slate-950/90 text-xs flex items-center justify-between text-slate-400">
-        <span className="flex items-center gap-1 text-[11px]">
-          <Layers className="w-3.5 h-3.5 text-indigo-400" />
+      <div className="p-3.5 border-t border-[#121417]/10 bg-[#F9F8F5] text-xs flex items-center justify-between text-[#121417]/70 font-bold">
+        <span className="flex items-center gap-1.5 text-[11px]">
+          <Layers className="w-3.5 h-3.5 text-[#121417]" />
           <span>{totalVideos} Lectures Total</span>
         </span>
-        <span className="text-[11px] font-mono text-indigo-300 font-semibold">
+        <span className="text-[11px] font-mono text-[#121417] px-2 py-0.5 rounded-full bg-[#EBF755] border border-[#121417]/20">
           {progressPercent}% Done
         </span>
       </div>

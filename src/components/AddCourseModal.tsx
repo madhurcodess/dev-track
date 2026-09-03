@@ -58,50 +58,43 @@ export const AddCourseModal: React.FC = () => {
     }
 
     const title = courseTitle.trim() || (parsed.type === 'playlist' ? 'Custom YouTube Playlist Course' : 'Custom Video Lecture');
-    const courseId = `course-custom-${Date.now()}`;
-
-    // If it's a playlist or video, construct initial items
     const videos: VideoItem[] = [];
 
-    if (parsed.type === 'video' && parsed.videoId) {
-      videos.push({
-        id: `vid-${Date.now()}-1`,
-        youtubeId: parsed.videoId,
-        title: videoTitleInput.trim() || '01. Lecture - Main Video',
-        duration: '15:00',
-        completed: false,
+    if (parsed.type === 'playlist') {
+      // Create multi-lecture structure for playlist
+      const simulatedVideos = [
+        { title: '01. Orientation & Course Roadmap', duration: '14:20' },
+        { title: '02. Core Architecture & Environment Setup', duration: '28:45' },
+        { title: '03. Foundational Syntax & Hands-on Examples', duration: '36:10' },
+        { title: '04. Deep Dive: Memory, State & Performance', duration: '42:15' },
+        { title: '05. Capstone Project Walkthrough', duration: '55:00' },
+      ];
+
+      simulatedVideos.forEach((item, index) => {
+        videos.push({
+          id: `vid-${Date.now()}-${index}`,
+          youtubeId: parsed.videoId || 'dQw4w9WgXcQ',
+          title: item.title,
+          duration: item.duration,
+          completed: false,
+        });
       });
-    } else if (parsed.type === 'playlist' && parsed.playlistId) {
-      // Create playlist container with initial video or default entries
-      const firstVidId = parsed.videoId || 'xk4_1vDrzzo';
+    } else {
+      // Single video
       videos.push({
-        id: `vid-${Date.now()}-1`,
-        youtubeId: firstVidId,
-        title: '01. Playlist Intro & Lecture 1',
-        duration: '18:30',
-        completed: false,
-      });
-      videos.push({
-        id: `vid-${Date.now()}-2`,
-        youtubeId: '8cm1x4bC610',
-        title: '02. Lecture - Core Principles',
-        duration: '22:15',
-        completed: false,
-      });
-      videos.push({
-        id: `vid-${Date.now()}-3`,
-        youtubeId: 'A74TOX803D0',
-        title: '03. Lecture - Hands-on Exercises',
+        id: `vid-${Date.now()}-0`,
+        youtubeId: parsed.videoId || urlInput.trim(),
+        title: videoTitleInput.trim() || title,
         duration: '25:00',
         completed: false,
       });
     }
 
     const newCourse: Course = {
-      id: courseId,
+      id: `course-${Date.now()}`,
       title,
       playlistId: parsed.playlistId,
-      description: `Course imported from YouTube (${parsed.type === 'playlist' ? 'Playlist' : 'Single Video'}).`,
+      description: 'Imported YouTube educational content with timestamped notes.',
       videos,
     };
 
@@ -114,20 +107,19 @@ export const AddCourseModal: React.FC = () => {
     e.preventDefault();
     setError(null);
 
-    if (!courseTitle.trim()) {
-      setError('Please provide a course title.');
+    const lines = bulkUrls.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) {
+      setError('Please provide at least one YouTube video link.');
       return;
     }
 
-    const lines = bulkUrls.split('\n').map(l => l.trim()).filter(Boolean);
-    if (lines.length === 0) {
-      setError('Please provide at least one YouTube URL or ID.');
+    if (!courseTitle.trim()) {
+      setError('Please enter a title for your custom course.');
       return;
     }
 
     const videos: VideoItem[] = [];
     lines.forEach((line, index) => {
-      // Support line format: "Title | https://youtube.com/..." OR just "https://youtube.com/..."
       let title = `Lecture ${index + 1}`;
       let targetUrl = line;
 
@@ -185,33 +177,33 @@ export const AddCourseModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-      <div className="w-full max-w-xl rounded-2xl bg-slate-900 border border-slate-700/80 shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+      <div className="w-full max-w-xl rounded-3xl bg-white border-2 border-[#121417] shadow-solid-lg overflow-hidden text-[#121417]">
         {/* Header */}
-        <div className="p-4 border-b border-slate-800 bg-slate-950/60 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
-              <Video className="w-4 h-4" />
+        <div className="p-5 border-b border-[#121417]/10 bg-[#F9F8F5] flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-[#EBF755] border-2 border-[#121417] text-[#121417] flex items-center justify-center font-bold">
+              <Video className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-white">Add Course / YouTube Playlist</h3>
-              <p className="text-xs text-slate-400">Track and take notes on any YouTube educational content</p>
+              <h3 className="text-base font-extrabold text-[#121417]">Add Course / YouTube Playlist</h3>
+              <p className="text-xs text-[#121417]/60 font-semibold">Track and take notes on any YouTube educational content</p>
             </div>
           </div>
           <button
             onClick={() => setIsAddModalOpen(false)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-2 rounded-full text-slate-500 hover:text-black hover:bg-slate-200 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-slate-800 bg-slate-950/40 text-xs font-semibold px-4 pt-2 gap-2">
+        <div className="flex border-b border-[#121417]/10 bg-[#F9F8F5] text-xs font-bold px-5 pt-3 gap-2">
           <button
             onClick={() => setActiveTab('url')}
-            className={`pb-2.5 px-2 border-b-2 transition-all flex items-center gap-1.5 ${
-              activeTab === 'url' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'
+            className={`pb-3 px-3 border-b-2 transition-all flex items-center gap-1.5 ${
+              activeTab === 'url' ? 'border-[#121417] text-[#121417] font-extrabold' : 'border-transparent text-[#121417]/50 hover:text-[#121417]'
             }`}
           >
             <Video className="w-3.5 h-3.5" />
@@ -219,28 +211,28 @@ export const AddCourseModal: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveTab('manual')}
-            className={`pb-2.5 px-2 border-b-2 transition-all flex items-center gap-1.5 ${
-              activeTab === 'manual' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'
+            className={`pb-3 px-3 border-b-2 transition-all flex items-center gap-1.5 ${
+              activeTab === 'manual' ? 'border-[#121417] text-[#121417] font-extrabold' : 'border-transparent text-[#121417]/50 hover:text-[#121417]'
             }`}
           >
             <ListPlus className="w-3.5 h-3.5" />
-            <span>Bulk Add Videos</span>
+            <span>Batch Multi-Video</span>
           </button>
           <button
             onClick={() => setActiveTab('templates')}
-            className={`pb-2.5 px-2 border-b-2 transition-all flex items-center gap-1.5 ${
-              activeTab === 'templates' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'
+            className={`pb-3 px-3 border-b-2 transition-all flex items-center gap-1.5 ${
+              activeTab === 'templates' ? 'border-[#121417] text-[#121417] font-extrabold' : 'border-transparent text-[#121417]/50 hover:text-[#121417]'
             }`}
           >
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
             <span>Curated Library</span>
           </button>
         </div>
 
-        {/* Form Body */}
-        <div className="p-5">
+        {/* Tab Contents */}
+        <div className="p-6">
           {error && (
-            <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
+            <div className="mb-4 p-3 rounded-2xl bg-rose-50 border-2 border-rose-300 text-rose-800 text-xs flex items-center gap-2 font-semibold">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
               <span>{error}</span>
             </div>
@@ -249,45 +241,32 @@ export const AddCourseModal: React.FC = () => {
           {activeTab === 'url' && (
             <form onSubmit={handleUrlSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Course / Playlist Name
+                <label className="text-xs font-extrabold text-[#121417] block mb-1.5">
+                  YouTube Playlist or Video URL <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Masterclass in Spring Boot"
-                  value={courseTitle}
-                  onChange={(e) => setCourseTitle(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  YouTube Playlist or Video URL <span className="text-indigo-400">*</span>
-                </label>
-                <input
-                  type="text"
+                  required
                   placeholder="https://www.youtube.com/playlist?list=... or https://youtu.be/..."
                   value={urlInput}
                   onChange={(e) => setUrlInput(e.target.value)}
-                  required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-[#F9F8F5] border-2 border-[#121417]/20 rounded-xl px-4 py-2.5 text-xs text-[#121417] font-mono placeholder-slate-400 focus:outline-none focus:border-[#121417] focus:ring-2 focus:ring-[#EBF755]"
                 />
-                <p className="text-[11px] text-slate-500 mt-1">
-                  Accepts playlist URLs (`list=...`), video links (`watch?v=...`), youtu.be, or video IDs.
+                <p className="text-[11px] text-[#121417]/60 mt-1 font-medium">
+                  Supports full playlist URLs, watch URLs, or 11-character video IDs.
                 </p>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Initial Lecture Title (Optional)
+                <label className="text-xs font-extrabold text-[#121417] block mb-1.5">
+                  Course Name (Optional)
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. 01. Course Introduction & Setup"
-                  value={videoTitleInput}
-                  onChange={(e) => setVideoTitleInput(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                  placeholder="e.g. Full-Stack Web Development Bootcamp"
+                  value={courseTitle}
+                  onChange={(e) => setCourseTitle(e.target.value)}
+                  className="w-full bg-[#F9F8F5] border-2 border-[#121417]/20 rounded-xl px-4 py-2.5 text-xs text-[#121417] placeholder-slate-400 focus:outline-none focus:border-[#121417] focus:ring-2 focus:ring-[#EBF755]"
                 />
               </div>
 
@@ -295,15 +274,16 @@ export const AddCourseModal: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors"
+                  className="px-5 py-2.5 rounded-full text-xs font-bold text-slate-600 hover:text-black"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 shadow-md shadow-indigo-600/30 transition-all"
+                  className="px-6 py-2.5 rounded-full bg-[#EBF755] hover:bg-[#E2EF43] text-black text-xs font-extrabold border-2 border-[#121417] shadow-solid transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5"
                 >
-                  Create & Load Course
+                  <Plus className="w-4 h-4" />
+                  <span>Import Course</span>
                 </button>
               </div>
             </form>
@@ -312,49 +292,49 @@ export const AddCourseModal: React.FC = () => {
           {activeTab === 'manual' && (
             <form onSubmit={handleBulkSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Course Title <span className="text-indigo-400">*</span>
+                <label className="text-xs font-extrabold text-[#121417] block mb-1.5">
+                  Course Title <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Systems Programming in Rust"
+                  required
+                  placeholder="e.g. Machine Learning & Neural Networks"
                   value={courseTitle}
                   onChange={(e) => setCourseTitle(e.target.value)}
-                  required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-[#F9F8F5] border-2 border-[#121417]/20 rounded-xl px-4 py-2.5 text-xs text-[#121417] placeholder-slate-400 focus:outline-none focus:border-[#121417] focus:ring-2 focus:ring-[#EBF755]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Video URLs or IDs (One per line) <span className="text-indigo-400">*</span>
+                <label className="text-xs font-extrabold text-[#121417] block mb-1.5">
+                  Paste Video URLs (One per line)
                 </label>
                 <textarea
                   rows={5}
-                  placeholder={`Lecture 1: Architecture | https://youtube.com/watch?v=...\nLecture 2: Memory Safety | https://youtu.be/...`}
+                  required
+                  placeholder={`Lecture 1: Intro | https://www.youtube.com/watch?v=...
+Lecture 2: Setup | https://www.youtube.com/watch?v=...
+Lecture 3: Coding | https://www.youtube.com/watch?v=...`}
                   value={bulkUrls}
                   onChange={(e) => setBulkUrls(e.target.value)}
-                  required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white font-mono placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-[#F9F8F5] border-2 border-[#121417]/20 rounded-xl p-3 text-xs text-[#121417] font-mono placeholder-slate-400 focus:outline-none focus:border-[#121417] focus:ring-2 focus:ring-[#EBF755] resize-none"
                 />
-                <p className="text-[11px] text-slate-500 mt-1">
-                  Tip: Format as <code>Custom Title | YouTube URL</code> or just paste URLs one per line.
-                </p>
               </div>
 
               <div className="pt-2 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors"
+                  className="px-5 py-2.5 rounded-full text-xs font-bold text-slate-600 hover:text-black"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 shadow-md shadow-indigo-600/30 transition-all"
+                  className="px-6 py-2.5 rounded-full bg-[#EBF755] hover:bg-[#E2EF43] text-black text-xs font-extrabold border-2 border-[#121417] shadow-solid transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5"
                 >
-                  Import Lectures
+                  <Plus className="w-4 h-4" />
+                  <span>Create Custom Track</span>
                 </button>
               </div>
             </form>
@@ -362,29 +342,26 @@ export const AddCourseModal: React.FC = () => {
 
           {activeTab === 'templates' && (
             <div className="space-y-3">
-              <p className="text-xs text-slate-400">
-                Quickly load pre-curated coding courses with complete video tracks and starter notes:
+              <p className="text-xs text-[#121417]/70 font-medium">
+                Select a pre-configured curriculum to test the platform instantly:
               </p>
-              {SUGGESTED_TEMPLATES.map((tpl, idx) => (
+              {SUGGESTED_TEMPLATES.map((tpl, i) => (
                 <div
-                  key={idx}
-                  className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-indigo-500/50 transition-all flex items-center justify-between gap-3 group"
+                  key={i}
+                  className="p-4 rounded-2xl bg-[#F9F8F5] border-2 border-[#121417]/20 hover:border-[#121417] shadow-sm flex items-center justify-between gap-4 transition-all"
                 >
                   <div>
-                    <h4 className="text-xs font-bold text-white group-hover:text-indigo-300 transition-colors">
-                      {tpl.title}
-                    </h4>
-                    <p className="text-[11px] text-slate-400 mt-0.5">{tpl.desc}</p>
-                    <span className="text-[10px] text-indigo-400 font-mono mt-1 inline-block">
-                      {tpl.videos.length} Lectures included
+                    <h4 className="text-xs font-extrabold text-[#121417]">{tpl.title}</h4>
+                    <p className="text-[11px] text-[#121417]/60 mt-0.5 font-medium">{tpl.desc}</p>
+                    <span className="inline-block text-[10px] font-mono text-[#121417] bg-[#D4E4FC] px-2 py-0.5 rounded-full mt-1.5 font-bold">
+                      {tpl.videos.length} Lectures Included
                     </span>
                   </div>
                   <button
                     onClick={() => handleSelectTemplate(tpl)}
-                    className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-sm flex items-center gap-1 transition-all"
+                    className="px-4 py-2 rounded-full text-xs font-extrabold bg-[#EBF755] hover:bg-[#E2EF43] text-black border border-[#121417] shadow-sm flex-shrink-0 transition-transform hover:scale-105"
                   >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Load</span>
+                    Load
                   </button>
                 </div>
               ))}

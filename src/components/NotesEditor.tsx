@@ -61,7 +61,6 @@ export const NotesEditor: React.FC = () => {
     setContent(newContent);
     saveNoteForCurrentVideo(newContent);
 
-    // Reposition cursor
     setTimeout(() => {
       textarea.focus();
       textarea.setSelectionRange(
@@ -146,12 +145,12 @@ export const NotesEditor: React.FC = () => {
 
   if (!activeVideo) {
     return (
-      <section className="w-full lg:w-[450px] xl:w-[500px] flex-shrink-0 h-[calc(100vh-4rem)] flex flex-col border-l border-slate-800 bg-slate-950/70 backdrop-blur-xl p-8 items-center justify-center text-center">
-        <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 text-slate-500 flex items-center justify-center mb-3">
-          <Edit3 className="w-6 h-6" />
+      <section className="w-full lg:w-[450px] xl:w-[500px] flex-shrink-0 h-[calc(100vh-4rem)] flex flex-col border-l border-[#121417]/10 bg-white p-8 items-center justify-center text-center">
+        <div className="w-14 h-14 rounded-2xl bg-[#D4E4FC] border-2 border-[#121417] text-[#121417] flex items-center justify-center mb-4 shadow-solid">
+          <Edit3 className="w-7 h-7" />
         </div>
-        <h3 className="text-sm font-bold text-slate-300 mb-1">Notes Workspace</h3>
-        <p className="text-xs text-slate-500 max-w-[220px]">
+        <h3 className="text-base font-extrabold text-[#121417] mb-1.5">Contextual Notes</h3>
+        <p className="text-xs text-[#121417]/70 max-w-[220px] font-medium leading-relaxed">
           Add a course and select a lecture to start taking timestamped notes and code snippets.
         </p>
       </section>
@@ -159,42 +158,42 @@ export const NotesEditor: React.FC = () => {
   }
 
   return (
-    <section className="w-full lg:w-[450px] xl:w-[500px] flex-shrink-0 h-[calc(100vh-4rem)] flex flex-col border-l border-slate-800 bg-slate-950/70 backdrop-blur-xl">
+    <section className="w-full lg:w-[450px] xl:w-[500px] flex-shrink-0 h-[calc(100vh-4rem)] flex flex-col border-l border-[#121417]/10 bg-white">
       {/* Notes Top Header */}
-      <div className="p-3 border-b border-slate-800 flex items-center justify-between gap-2">
+      <div className="p-4 border-b border-[#121417]/10 bg-[#F9F8F5]/50 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Edit3 className="w-4 h-4 text-indigo-400" />
-          <h2 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+          <Edit3 className="w-4 h-4 text-[#121417]" />
+          <h2 className="text-xs font-extrabold text-[#121417] uppercase tracking-wider">
             Contextual Notes
           </h2>
         </div>
 
         {/* Auto-save status */}
-        <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
-          <span className={`w-2 h-2 rounded-full ${isNoteSaving ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`} />
+        <div className="flex items-center gap-1.5 text-[11px] text-[#121417]/60 font-semibold">
+          <span className={`w-2 h-2 rounded-full ${isNoteSaving ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
           <span>{isNoteSaving ? 'Saving...' : lastSavedTime ? `Saved at ${lastSavedTime}` : 'Auto-saved'}</span>
         </div>
       </div>
 
       {/* Formatting Toolbar */}
-      <div className="px-3 py-2 border-b border-slate-800/80 bg-slate-900/40 flex items-center justify-between gap-1 flex-wrap">
+      <div className="px-3.5 py-2 border-b border-[#121417]/10 bg-[#F9F8F5] flex items-center justify-between gap-1 flex-wrap">
         {/* Text Actions */}
         <div className="flex items-center gap-1">
           {/* Timestamp Button */}
           <button
             onClick={handleInsertTimestamp}
-            className="flex items-center gap-1 px-2 py-1 rounded bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 text-xs font-medium transition-colors"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#D4E4FC] hover:bg-[#C2DBFB] border border-[#121417]/20 text-[#121417] text-xs font-bold transition-all shadow-sm hover:scale-105"
             title="Insert current video timestamp"
           >
             <Clock className="w-3.5 h-3.5" />
             <span className="font-mono text-[11px]">Timestamp</span>
           </button>
 
-          <div className="w-[1px] h-4 bg-slate-800 mx-0.5" />
+          <div className="w-[1px] h-4 bg-slate-300 mx-1" />
 
           <button
             onClick={() => insertFormatting('**', '**', 'bold text')}
-            className="p-1.5 rounded text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-700 hover:text-black hover:bg-slate-200 transition-colors"
             title="Bold (**text**)"
           >
             <Bold className="w-3.5 h-3.5" />
@@ -202,7 +201,7 @@ export const NotesEditor: React.FC = () => {
 
           <button
             onClick={() => insertFormatting('*', '*', 'italic text')}
-            className="p-1.5 rounded text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-700 hover:text-black hover:bg-slate-200 transition-colors"
             title="Italic (*text*)"
           >
             <Italic className="w-3.5 h-3.5" />
@@ -210,7 +209,7 @@ export const NotesEditor: React.FC = () => {
 
           <button
             onClick={() => insertFormatting('### ', '', 'Header')}
-            className="p-1.5 rounded text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-700 hover:text-black hover:bg-slate-200 transition-colors"
             title="Heading (###)"
           >
             <Heading2 className="w-3.5 h-3.5" />
@@ -218,7 +217,7 @@ export const NotesEditor: React.FC = () => {
 
           <button
             onClick={() => insertFormatting('- ', '', 'List item')}
-            className="p-1.5 rounded text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-700 hover:text-black hover:bg-slate-200 transition-colors"
             title="Bullet list (- )"
           >
             <List className="w-3.5 h-3.5" />
@@ -226,15 +225,15 @@ export const NotesEditor: React.FC = () => {
 
           <button
             onClick={handleInsertCodeSnippet}
-            className="p-1.5 rounded text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
-            title="Insert Java / Code Block"
+            className="p-1.5 rounded-lg text-slate-700 hover:text-black hover:bg-slate-200 transition-colors"
+            title="Insert Code Block"
           >
             <Terminal className="w-3.5 h-3.5" />
           </button>
 
           <button
             onClick={() => insertFormatting('> ', '', 'Quote note')}
-            className="p-1.5 rounded text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-700 hover:text-black hover:bg-slate-200 transition-colors"
             title="Blockquote (> )"
           >
             <Quote className="w-3.5 h-3.5" />
@@ -242,11 +241,11 @@ export const NotesEditor: React.FC = () => {
         </div>
 
         {/* View Toggle */}
-        <div className="flex items-center gap-0.5 bg-slate-900 p-0.5 rounded-lg border border-slate-800">
+        <div className="flex items-center gap-0.5 bg-white p-1 rounded-full border border-[#121417]/15 shadow-sm">
           <button
             onClick={() => setViewMode('edit')}
-            className={`p-1 rounded text-xs transition-all ${
-              viewMode === 'edit' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+            className={`p-1 px-1.5 rounded-full text-xs font-bold transition-all ${
+              viewMode === 'edit' ? 'bg-[#121417] text-[#EBF755]' : 'text-slate-600 hover:text-black'
             }`}
             title="Editor view"
           >
@@ -254,8 +253,8 @@ export const NotesEditor: React.FC = () => {
           </button>
           <button
             onClick={() => setViewMode('split')}
-            className={`p-1 rounded text-xs transition-all hidden sm:block ${
-              viewMode === 'split' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+            className={`p-1 px-1.5 rounded-full text-xs font-bold transition-all hidden sm:block ${
+              viewMode === 'split' ? 'bg-[#121417] text-[#EBF755]' : 'text-slate-600 hover:text-black'
             }`}
             title="Split view (Edit + Preview)"
           >
@@ -263,8 +262,8 @@ export const NotesEditor: React.FC = () => {
           </button>
           <button
             onClick={() => setViewMode('preview')}
-            className={`p-1 rounded text-xs transition-all ${
-              viewMode === 'preview' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+            className={`p-1 px-1.5 rounded-full text-xs font-bold transition-all ${
+              viewMode === 'preview' ? 'bg-[#121417] text-[#EBF755]' : 'text-slate-600 hover:text-black'
             }`}
             title="Live interactive preview"
           >
@@ -281,21 +280,21 @@ export const NotesEditor: React.FC = () => {
             value={content}
             onChange={handleContentChange}
             placeholder="Type notes, code snippets, or click 'Timestamp' to mark video points..."
-            className="w-full h-full p-4 bg-transparent text-slate-200 text-sm font-mono resize-none focus:outline-none placeholder-slate-600 leading-relaxed overflow-y-auto"
+            className="w-full h-full p-4 bg-white text-[#121417] text-xs font-mono resize-none focus:outline-none placeholder-slate-400 leading-relaxed overflow-y-auto"
           />
         )}
 
         {viewMode === 'preview' && (
-          <div className="w-full h-full p-4 overflow-y-auto markdown-body">
+          <div className="w-full h-full p-4 overflow-y-auto">
             <InteractiveMarkdown content={content} onTimestampClick={seekTo} />
           </div>
         )}
 
         {viewMode === 'split' && (
-          <div className="w-full h-full flex flex-col divide-y divide-slate-800">
+          <div className="w-full h-full flex flex-col divide-y divide-[#121417]/10">
             {/* Editor half */}
             <div className="h-1/2 flex flex-col">
-              <div className="px-3 py-1 bg-slate-900/60 text-[10px] uppercase font-bold tracking-wider text-slate-400 border-b border-slate-800/40">
+              <div className="px-3 py-1.5 bg-[#F9F8F5] text-[10px] uppercase font-bold tracking-wider text-[#121417]/60 border-b border-[#121417]/10">
                 Markdown Editor
               </div>
               <textarea
@@ -303,17 +302,17 @@ export const NotesEditor: React.FC = () => {
                 value={content}
                 onChange={handleContentChange}
                 placeholder="Type notes here..."
-                className="flex-1 p-3 bg-transparent text-slate-200 text-xs font-mono resize-none focus:outline-none placeholder-slate-600 leading-relaxed overflow-y-auto"
+                className="flex-1 p-3 bg-white text-[#121417] text-xs font-mono resize-none focus:outline-none placeholder-slate-400 leading-relaxed overflow-y-auto"
               />
             </div>
 
             {/* Preview half */}
-            <div className="h-1/2 flex flex-col bg-slate-950/50">
-              <div className="px-3 py-1 bg-slate-900/60 text-[10px] uppercase font-bold tracking-wider text-slate-400 border-b border-slate-800/40 flex items-center justify-between">
+            <div className="h-1/2 flex flex-col bg-[#F9F8F5]/40">
+              <div className="px-3 py-1.5 bg-[#F9F8F5] text-[10px] uppercase font-bold tracking-wider text-[#121417]/60 border-b border-[#121417]/10 flex items-center justify-between">
                 <span>Interactive Live Preview</span>
-                <span className="text-[9px] text-indigo-400 font-normal">Click any [00:00] to seek video</span>
+                <span className="text-[10px] text-[#121417] font-bold">Click [00:00] to seek video</span>
               </div>
-              <div className="flex-1 p-3 overflow-y-auto markdown-body text-xs">
+              <div className="flex-1 p-3 overflow-y-auto text-xs">
                 <InteractiveMarkdown content={content} onTimestampClick={seekTo} />
               </div>
             </div>
@@ -322,23 +321,23 @@ export const NotesEditor: React.FC = () => {
       </div>
 
       {/* Export & Action Footer */}
-      <div className="p-2.5 border-t border-slate-800 bg-slate-950/90 flex items-center justify-between gap-2 text-xs">
+      <div className="p-3 border-t border-[#121417]/10 bg-[#F9F8F5] flex items-center justify-between gap-2 text-xs font-bold">
         <div className="flex items-center gap-1.5">
           <button
             onClick={handleCopyNotes}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white hover:bg-slate-100 text-[#121417] border border-[#121417]/20 shadow-sm transition-all"
             title="Copy notes to clipboard"
           >
-            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
             <span className="text-[11px]">{copied ? 'Copied!' : 'Copy'}</span>
           </button>
         </div>
 
         <div className="flex items-center gap-1.5">
-          <span className="text-[11px] text-slate-400 mr-1">Export:</span>
+          <span className="text-[11px] text-[#121417]/60 mr-1">Export:</span>
           <button
             onClick={handleExportMarkdown}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-600/15 hover:bg-indigo-600/25 text-indigo-300 border border-indigo-500/20 text-[11px] font-medium transition-colors"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#D4E4FC] hover:bg-[#C2DBFB] text-[#121417] border border-[#121417]/20 text-[11px] shadow-sm transition-all"
             title="Export as Markdown .md file"
           >
             <FileDown className="w-3 h-3" />
@@ -346,7 +345,7 @@ export const NotesEditor: React.FC = () => {
           </button>
           <button
             onClick={handleExportText}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-[11px] font-medium transition-colors"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white hover:bg-slate-100 text-[#121417] border border-[#121417]/20 text-[11px] shadow-sm transition-all"
             title="Export as Plain text .txt file"
           >
             <FileDown className="w-3 h-3" />
@@ -358,31 +357,29 @@ export const NotesEditor: React.FC = () => {
   );
 };
 
-// Interactive Markdown component: detects [mm:ss] and renders clickable jump chips
+// Interactive Markdown component with editorial lime timestamp chips
 const InteractiveMarkdown: React.FC<{
   content: string;
   onTimestampClick: (seconds: number) => void;
 }> = ({ content, onTimestampClick }) => {
   if (!content.trim()) {
-    return <p className="text-slate-400 italic text-xs">Notes are empty. Start typing above...</p>;
+    return <p className="text-slate-400 italic text-xs font-medium">Notes are empty. Start typing above...</p>;
   }
 
-  // Parse lines into simple markdown elements + interactive timestamp chips
   const lines = content.split('\n');
   let inCodeBlock = false;
   let codeBuffer: string[] = [];
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-2 text-[#121417]">
       {lines.map((line, idx) => {
-        // Code block start/end
         if (line.startsWith('```')) {
           if (inCodeBlock) {
             inCodeBlock = false;
             const codeText = codeBuffer.join('\n');
             codeBuffer = [];
             return (
-              <pre key={idx} className="my-2 p-2.5 rounded-lg bg-slate-950 border border-slate-800 font-mono text-[11px] overflow-x-auto text-indigo-200">
+              <pre key={idx} className="my-2.5 p-3 rounded-2xl bg-[#121417] border border-black font-mono text-[11px] overflow-x-auto text-[#EBF755] shadow-sm">
                 <code>{codeText}</code>
               </pre>
             );
@@ -399,24 +396,24 @@ const InteractiveMarkdown: React.FC<{
 
         // Headings
         if (line.startsWith('# ')) {
-          return <h1 key={idx} className="text-base font-bold text-white mt-2 mb-1">{renderInlineText(line.replace('# ', ''), onTimestampClick)}</h1>;
+          return <h1 key={idx} className="text-base font-extrabold text-[#121417] mt-2 mb-1">{renderInlineText(line.replace('# ', ''), onTimestampClick)}</h1>;
         }
         if (line.startsWith('## ')) {
-          return <h2 key={idx} className="text-sm font-semibold text-slate-100 mt-2 mb-1">{renderInlineText(line.replace('## ', ''), onTimestampClick)}</h2>;
+          return <h2 key={idx} className="text-sm font-bold text-[#121417] mt-2 mb-1">{renderInlineText(line.replace('## ', ''), onTimestampClick)}</h2>;
         }
         if (line.startsWith('### ')) {
-          return <h3 key={idx} className="text-xs font-semibold text-indigo-300 mt-1.5 mb-1">{renderInlineText(line.replace('### ', ''), onTimestampClick)}</h3>;
+          return <h3 key={idx} className="text-xs font-extrabold text-[#121417] mt-1.5 mb-1">{renderInlineText(line.replace('### ', ''), onTimestampClick)}</h3>;
         }
 
         // Horizontal Rule
         if (line.trim() === '---' || line.trim() === '***') {
-          return <hr key={idx} className="border-slate-800 my-2" />;
+          return <hr key={idx} className="border-[#121417]/15 my-2" />;
         }
 
         // Blockquote
         if (line.startsWith('> ')) {
           return (
-            <blockquote key={idx} className="border-l-2 border-indigo-500 pl-2 text-slate-400 italic text-xs my-1">
+            <blockquote key={idx} className="border-l-3 border-[#121417] pl-2.5 text-[#121417]/70 italic text-xs my-1 font-medium">
               {renderInlineText(line.replace('> ', ''), onTimestampClick)}
             </blockquote>
           );
@@ -427,9 +424,9 @@ const InteractiveMarkdown: React.FC<{
           const isChecked = line.startsWith('- [x] ');
           const label = line.slice(6);
           return (
-            <div key={idx} className="flex items-center gap-2 text-xs text-slate-300 my-0.5">
-              <input type="checkbox" checked={isChecked} readOnly className="rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-0" />
-              <span className={isChecked ? 'line-through text-slate-500' : ''}>{renderInlineText(label, onTimestampClick)}</span>
+            <div key={idx} className="flex items-center gap-2 text-xs text-[#121417] my-0.5 font-medium">
+              <input type="checkbox" checked={isChecked} readOnly className="rounded border-black text-black focus:ring-0" />
+              <span className={isChecked ? 'line-through text-slate-400' : ''}>{renderInlineText(label, onTimestampClick)}</span>
             </div>
           );
         }
@@ -437,8 +434,8 @@ const InteractiveMarkdown: React.FC<{
         // Bullet list
         if (line.startsWith('- ') || line.startsWith('* ')) {
           return (
-            <div key={idx} className="flex items-start gap-2 text-xs text-slate-300 my-0.5">
-              <span className="text-indigo-400 font-bold">•</span>
+            <div key={idx} className="flex items-start gap-2 text-xs text-[#121417] my-0.5 font-medium">
+              <span className="text-[#121417] font-black">•</span>
               <div className="flex-1">{renderInlineText(line.substring(2), onTimestampClick)}</div>
             </div>
           );
@@ -446,12 +443,12 @@ const InteractiveMarkdown: React.FC<{
 
         // Empty line
         if (!line.trim()) {
-          return <div key={idx} className="h-2" />;
+          return <div key={idx} className="h-1.5" />;
         }
 
         // Regular paragraph
         return (
-          <p key={idx} className="text-xs text-slate-300 leading-relaxed my-0.5">
+          <p key={idx} className="text-xs text-[#121417] leading-relaxed my-0.5 font-medium">
             {renderInlineText(line, onTimestampClick)}
           </p>
         );
@@ -460,9 +457,8 @@ const InteractiveMarkdown: React.FC<{
   );
 };
 
-// Replace [mm:ss] or [hh:mm:ss] with interactive buttons that jump video playback
+// Replace [mm:ss] or [hh:mm:ss] with vibrant lime clickable buttons
 function renderInlineText(text: string, onTimestampClick: (seconds: number) => void): React.ReactNode {
-  // Regex to match [00:00] or [00:00:00]
   const timestampRegex = /\[(\d{1,2}:\d{2}(?::\d{2})?)\]/g;
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
@@ -472,7 +468,6 @@ function renderInlineText(text: string, onTimestampClick: (seconds: number) => v
     const start = match.index;
     const end = timestampRegex.lastIndex;
 
-    // Push text before the match
     if (start > lastIndex) {
       parts.push(text.substring(lastIndex, start));
     }
@@ -488,10 +483,10 @@ function renderInlineText(text: string, onTimestampClick: (seconds: number) => v
             onTimestampClick(totalSeconds);
           }
         }}
-        className="inline-flex items-center gap-1 px-1.5 py-0.5 mx-1 rounded bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 hover:text-indigo-100 border border-indigo-500/30 font-mono text-[11px] font-semibold cursor-pointer transition-all active:scale-95 group"
+        className="inline-flex items-center gap-1 px-2.5 py-0.5 mx-1 rounded-full bg-[#EBF755] hover:bg-[#E2EF43] text-black border border-[#121417] font-mono text-[11px] font-extrabold cursor-pointer shadow-sm transition-all hover:scale-105 active:scale-95 group"
         title={`Jump video to ${timeStr}`}
       >
-        <Clock className="w-2.5 h-2.5 text-indigo-400 group-hover:text-indigo-200" />
+        <Clock className="w-2.5 h-2.5 text-black" />
         <span>{timeStr}</span>
       </button>
     );
