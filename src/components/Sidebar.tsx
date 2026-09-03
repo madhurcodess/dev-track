@@ -12,7 +12,9 @@ import {
   Layers, 
   ChevronDown, 
   Clock,
-  PanelLeftClose
+  PanelLeftClose,
+  LayoutGrid,
+  Tv
 } from 'lucide-react';
 import { AdBanner } from './AdBanner';
 
@@ -29,6 +31,8 @@ export const Sidebar: React.FC = () => {
     setIsAddModalOpen,
     isSidebarOpen,
     setIsSidebarOpen,
+    currentView,
+    setCurrentView,
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -39,15 +43,48 @@ export const Sidebar: React.FC = () => {
 
   if (!activeCourse || courses.length === 0) {
     return (
-      <aside className="w-80 sm:w-88 flex-shrink-0 h-[calc(100vh-4rem)] flex flex-col border-r border-[#121417]/10 bg-white p-6 relative items-center justify-center text-center">
-        <button
-          onClick={() => setIsSidebarOpen(false)}
-          className="absolute top-4 right-4 p-1 rounded-lg text-[#121417]/50 hover:text-[#121417] hover:bg-black/5 transition-colors"
-          title="Hide Playlist Sidebar"
-        >
-          <PanelLeftClose className="w-4 h-4" />
-        </button>
-        <div className="w-14 h-14 rounded-2xl bg-[#EBF755] border-2 border-[#121417] text-[#121417] flex items-center justify-center mb-4 shadow-solid">
+      <aside className="w-80 sm:w-88 flex-shrink-0 h-[calc(100vh-4rem)] flex flex-col border-r border-[#121417]/10 bg-white">
+        {/* View Switcher: All Playlists vs Learning Workspace (Directly Below Logo) */}
+        <div className="p-3 border-b border-[#121417]/10 bg-[#F9F8F5]/80 flex items-center justify-between gap-2">
+          <div className="grid grid-cols-2 gap-1.5 p-1 bg-white rounded-2xl border border-[#121417]/15 shadow-xs flex-1">
+            <button
+              onClick={() => setCurrentView('playlists')}
+              className={`flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-black transition-all ${
+                currentView === 'playlists'
+                  ? 'bg-[#121417] text-[#EBF755] shadow-xs'
+                  : 'text-[#121417]/70 hover:text-[#121417] hover:bg-black/5'
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>Playlists</span>
+            </button>
+
+            <button
+              onClick={() => setCurrentView('workspace')}
+              disabled={!activeCourse}
+              className={`flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-black transition-all ${
+                currentView === 'workspace'
+                  ? 'bg-[#121417] text-[#EBF755] shadow-xs'
+                  : activeCourse 
+                  ? 'text-[#121417]/70 hover:text-[#121417] hover:bg-black/5'
+                  : 'opacity-40 cursor-not-allowed text-[#121417]/40'
+              }`}
+            >
+              <Tv className="w-3.5 h-3.5" />
+              <span>Workspace</span>
+            </button>
+          </div>
+          <button
+            onClick={() => setIsSidebarOpen(false)}
+            className="p-1 rounded-lg text-[#121417]/50 hover:text-[#121417] hover:bg-black/5 transition-colors"
+            title="Hide Playlist Sidebar"
+          >
+            <PanelLeftClose className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 flex flex-col p-6 items-center justify-center text-center">
+          <div className="w-14 h-14 rounded-2xl bg-[#EBF755] border-2 border-[#121417] text-[#121417] flex items-center justify-center mb-4 shadow-solid">
           <FolderPlus className="w-7 h-7" />
         </div>
         <h3 className="text-base font-extrabold text-[#121417] mb-1.5">No Playlists Yet</h3>
@@ -61,6 +98,7 @@ export const Sidebar: React.FC = () => {
           <FolderPlus className="w-4 h-4" />
           <span>+ Add Course / Playlist</span>
         </button>
+        </div>
       </aside>
     );
   }
@@ -79,6 +117,38 @@ export const Sidebar: React.FC = () => {
 
   return (
     <aside className="w-80 sm:w-88 flex-shrink-0 h-[calc(100vh-4rem)] flex flex-col border-r border-[#121417]/10 bg-white">
+      {/* View Switcher: All Playlists vs Learning Workspace (Directly Below Logo) */}
+      <div className="p-3 border-b border-[#121417]/10 bg-[#F9F8F5]/80">
+        <div className="grid grid-cols-2 gap-1.5 p-1 bg-white rounded-2xl border border-[#121417]/15 shadow-xs">
+          <button
+            onClick={() => setCurrentView('playlists')}
+            className={`flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-black transition-all ${
+              currentView === 'playlists'
+                ? 'bg-[#121417] text-[#EBF755] shadow-xs'
+                : 'text-[#121417]/70 hover:text-[#121417] hover:bg-black/5'
+            }`}
+          >
+            <LayoutGrid className="w-3.5 h-3.5" />
+            <span>Playlists</span>
+          </button>
+
+          <button
+            onClick={() => setCurrentView('workspace')}
+            disabled={!activeCourse}
+            className={`flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-black transition-all ${
+              currentView === 'workspace'
+                ? 'bg-[#121417] text-[#EBF755] shadow-xs'
+                : activeCourse 
+                ? 'text-[#121417]/70 hover:text-[#121417] hover:bg-black/5'
+                : 'opacity-40 cursor-not-allowed text-[#121417]/40'
+            }`}
+          >
+            <Tv className="w-3.5 h-3.5" />
+            <span>Workspace</span>
+          </button>
+        </div>
+      </div>
+
       {/* Course Selector Dropdown */}
       <div className="p-4 border-b border-[#121417]/10 bg-[#F9F8F5]/50">
         <div className="flex items-center justify-between mb-1.5">

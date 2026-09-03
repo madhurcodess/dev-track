@@ -3,8 +3,6 @@ import { useApp } from '../context/AppContext';
 import { 
   Plus, 
   Sparkles,
-  LayoutGrid,
-  Tv,
   Flame,
   Coffee
 } from 'lucide-react';
@@ -27,7 +25,7 @@ export const Header: React.FC = () => {
 
   return (
     <header className="sticky top-0 z-30 h-16 w-full border-b border-[#121417]/10 bg-[#F9F8F5]/95 backdrop-blur-md px-3 sm:px-5 lg:px-6 flex items-center justify-between gap-3">
-      {/* Left: Brand & View Switcher */}
+      {/* Left: Brand Logo */}
       <div className="flex items-center gap-2 sm:gap-3 min-w-fit">
         {/* Custom Brand Logo - Click to go to Playlists */}
         <button 
@@ -37,36 +35,6 @@ export const Header: React.FC = () => {
         >
           <BrandLogo size="md" />
         </button>
-
-        {/* View Switcher: All Playlists vs Player Workspace */}
-        <div className="hidden sm:flex items-center ml-2 pl-2 border-l border-[#121417]/15 gap-1.5">
-          <button
-            onClick={() => setCurrentView('playlists')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
-              currentView === 'playlists'
-                ? 'bg-[#121417] text-[#EBF755] shadow-sm'
-                : 'text-[#121417]/70 hover:text-[#121417] hover:bg-black/5'
-            }`}
-          >
-            <LayoutGrid className="w-3.5 h-3.5" />
-            <span>Playlists</span>
-          </button>
-
-          <button
-            onClick={() => setCurrentView('workspace')}
-            disabled={!activeCourse}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
-              currentView === 'workspace'
-                ? 'bg-[#121417] text-[#EBF755] shadow-sm'
-                : activeCourse 
-                ? 'text-[#121417]/70 hover:text-[#121417] hover:bg-black/5'
-                : 'opacity-40 cursor-not-allowed text-[#121417]/40'
-            }`}
-          >
-            <Tv className="w-3.5 h-3.5" />
-            <span>Workspace</span>
-          </button>
-        </div>
       </div>
 
       {/* Center: Global Progress Bar (shown when active in workspace) */}

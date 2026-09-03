@@ -222,6 +222,7 @@ export const PlayerWorkspace: React.FC = () => {
           rel: 0,
           enablejsapi: 1,
           origin: window.location.origin,
+          fs: 1,
         },
         events: {
           onReady: (event: any) => {
@@ -229,6 +230,11 @@ export const PlayerWorkspace: React.FC = () => {
             setPlayerStatus('ready');
             try {
               setVideoDurationSec(event.target.getDuration() || 0);
+              const iframe = event.target.getIframe?.() || document.querySelector('#youtube-player-element');
+              if (iframe) {
+                iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen');
+                iframe.setAttribute('allowfullscreen', 'true');
+              }
             } catch {}
             syncPlaylistIfAvailable(event.target);
             checkAndResumePlayback(event.target);
