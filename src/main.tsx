@@ -4,7 +4,7 @@ import { ClerkProvider } from '@clerk/clerk-react';
 import './index.css';
 import App from './App.tsx';
 
-const envKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+const envKey = (import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || import.meta.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) as string | undefined;
 const localKey = typeof window !== 'undefined' ? localStorage.getItem('devtrack_custom_clerk_key') : null;
 const rawKey = (envKey && !envKey.includes('your_clerk')) ? envKey : localKey;
 const clerkPubKey = (rawKey && rawKey.startsWith('pk_')) ? rawKey : '';
@@ -16,11 +16,15 @@ createRoot(document.getElementById('root')!).render(
         publishableKey={clerkPubKey}
         appearance={{
           variables: {
-            colorPrimary: '#6366f1',
-            colorBackground: '#0f172a',
-            colorInputBackground: '#090d16',
-            colorText: '#f8fafc',
-            colorTextSecondary: '#94a3b8',
+            colorPrimary: '#121417',
+            colorBackground: '#FFFFFF',
+            colorInputBackground: '#F9F8F5',
+            colorText: '#121417',
+            colorTextSecondary: '#5A606A',
+          },
+          elements: {
+            card: 'border-2 border-[#121417] shadow-solid-lg rounded-3xl',
+            formButtonPrimary: 'bg-[#EBF755] hover:bg-[#E2EF43] text-black font-extrabold border-2 border-[#121417] shadow-solid rounded-full',
           }
         }}
       >
