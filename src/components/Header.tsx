@@ -1,12 +1,6 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
-import { formatTime } from '../utils/youtube';
 import { 
-  Play, 
-  Pause, 
-  RotateCcw, 
-  Timer, 
-  Flame, 
   Plus, 
   PanelLeftClose, 
   PanelLeft, 
@@ -15,7 +9,8 @@ import {
   Sparkles,
   Cloud,
   LayoutGrid,
-  Tv
+  Tv,
+  Flame
 } from 'lucide-react';
 import { AuthBar } from './AuthBar';
 import { BrandLogo } from './BrandLogo';
@@ -23,15 +18,7 @@ import { BrandLogo } from './BrandLogo';
 export const Header: React.FC = () => {
   const {
     activeCourse,
-    pomodoroMode,
-    pomodoroTimeLeft,
-    isPomodoroRunning,
-    startPomodoro,
-    pausePomodoro,
-    resetPomodoro,
     pomodoroStats,
-    isPomodoroExpanded,
-    setIsPomodoroExpanded,
     isSidebarOpen,
     setIsSidebarOpen,
     isNotesOpen,
@@ -47,28 +34,6 @@ export const Header: React.FC = () => {
   const totalVideos = activeCourse?.videos.length || 0;
   const completedVideos = activeCourse?.videos.filter(v => v.completed).length || 0;
   const progressPercent = totalVideos > 0 ? Math.round((completedVideos / totalVideos) * 100) : 0;
-
-  const getModeBadge = () => {
-    switch (pomodoroMode) {
-      case 'work':
-        return 'bg-[#EBF755] text-[#121417] border-[#121417]/20';
-      case 'shortBreak':
-        return 'bg-[#D4E4FC] text-[#121417] border-[#121417]/20';
-      case 'longBreak':
-        return 'bg-amber-100 text-amber-900 border-amber-300';
-    }
-  };
-
-  const getModeLabel = () => {
-    switch (pomodoroMode) {
-      case 'work':
-        return 'Focus';
-      case 'shortBreak':
-        return 'Short Break';
-      case 'longBreak':
-        return 'Long Break';
-    }
-  };
 
   return (
     <header className="sticky top-0 z-30 h-16 w-full border-b border-[#121417]/10 bg-[#F9F8F5]/95 backdrop-blur-md px-3 sm:px-5 lg:px-6 flex items-center justify-between gap-3">
@@ -152,44 +117,11 @@ export const Header: React.FC = () => {
         </div>
       )}
 
-      {/* Right: Pomodoro Quick-Widget & Controls */}
+      {/* Right: Actions, Badges & Profile (Upper Timer Box Removed) */}
       <div className="flex items-center gap-2 sm:gap-3">
-        {/* Pomodoro Quick Pill */}
-        <div className="flex items-center gap-1.5 bg-white border border-[#121417]/15 rounded-full py-1 px-2.5 shadow-sm">
-          <button
-            onClick={() => setIsPomodoroExpanded(!isPomodoroExpanded)}
-            className={`flex items-center gap-1.5 text-xs font-bold px-2 py-0.5 rounded-full border transition-all ${getModeBadge()}`}
-            title="Open Pomodoro Settings"
-          >
-            <Timer className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{getModeLabel()}</span>
-            <span className="font-mono text-xs">{formatTime(pomodoroTimeLeft)}</span>
-          </button>
-
-          <button
-            onClick={isPomodoroRunning ? pausePomodoro : startPomodoro}
-            className={`p-1.5 rounded-full transition-all ${
-              isPomodoroRunning
-                ? 'bg-amber-100 text-amber-900 hover:bg-amber-200'
-                : 'bg-[#121417] text-[#EBF755] hover:bg-black shadow-sm'
-            }`}
-            title={isPomodoroRunning ? "Pause Timer" : "Start Timer"}
-          >
-            {isPomodoroRunning ? <Pause className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current ml-0.2" />}
-          </button>
-
-          <button
-            onClick={resetPomodoro}
-            className="p-1.5 rounded-full text-[#121417]/60 hover:text-[#121417] hover:bg-black/5 transition-colors"
-            title="Reset Timer"
-          >
-            <RotateCcw className="w-3 h-3" />
-          </button>
-        </div>
-
         {/* Focus Streak Badge */}
         <div 
-          className="hidden xl:flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full bg-white border border-[#121417]/15 text-[#121417] shadow-sm"
+          className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-white border border-[#121417]/15 text-[#121417] shadow-sm"
           title={`${pomodoroStats.sessionsCompleted} focus sessions completed today`}
         >
           <Flame className="w-4 h-4 fill-current text-orange-500" />
@@ -199,7 +131,7 @@ export const Header: React.FC = () => {
         {/* Cloud Sync Badge */}
         {isCloudConnected && (
           <div 
-            className="hidden 2xl:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-[#121417]/15 text-xs font-bold text-[#121417] shadow-sm"
+            className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-[#121417]/15 text-xs font-bold text-[#121417] shadow-sm"
             title={isCloudSyncing ? "Syncing data with Supabase..." : "Supabase Cloud Database Connected"}
           >
             <Cloud className={`w-3.5 h-3.5 ${isCloudSyncing ? 'text-amber-500 animate-pulse' : 'text-emerald-600'}`} />

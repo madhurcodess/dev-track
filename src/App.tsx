@@ -4,7 +4,6 @@ import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { PlayerWorkspace } from './components/PlayerWorkspace';
 import { NotesEditor } from './components/NotesEditor';
-import { PomodoroTimer } from './components/PomodoroTimer';
 import { AddCourseModal } from './components/AddCourseModal';
 import { LandingPage } from './components/LandingPage';
 import { PlaylistsView } from './components/PlaylistsView';
@@ -126,9 +125,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onBackToLanding }) => {
           )}
         </div>
       )}
-
-      {/* Floating Pomodoro Widget / Modal */}
-      <PomodoroTimer />
 
       {/* Add Course / YouTube Playlist Modal */}
       <AddCourseModal />
