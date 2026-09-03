@@ -8,6 +8,8 @@ import {
   CheckCircle2, 
   Maximize2, 
   Minimize2, 
+  Maximize,
+  Minimize,
   Clock, 
   ExternalLink, 
   BookmarkPlus, 
@@ -60,6 +62,26 @@ export const PlayerWorkspace: React.FC = () => {
   const [completionToast, setCompletionToast] = useState<string | null>(null);
   const hasAttemptedResumeRef = useRef<string | null>(null);
   const lastSavedSecRef = useRef<number>(0);
+
+  const videoWrapperRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+
+  const toggleFullscreen = () => {
+    if (!videoWrapperRef.current) return;
+    if (!document.fullscreenElement) {
+      videoWrapperRef.current.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  };
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
 
   const currentIndex = activeCourse ? activeCourse.videos.findIndex(v => v.id === activeVideoId) : -1;
   const hasPrevious = currentIndex > 0;
@@ -470,7 +492,7 @@ export const PlayerWorkspace: React.FC = () => {
         )}
 
         {/* 16:9 Responsive Video Aspect Ratio */}
-        <div className="relative w-full rounded-3xl overflow-hidden shadow-solid-lg border-2 border-[#121417] bg-black aspect-video group">
+        <div ref={videoWrapperRef} className="relative w-full rounded-3xl overflow-hidden shadow-solid-lg border-2 border-[#121417] bg-black aspect-video group">
           <div id="youtube-player-element" ref={playerContainerRef} className="w-full h-full" />
         </div>
 
@@ -604,6 +626,15 @@ export const PlayerWorkspace: React.FC = () => {
                 title={isTheaterMode ? "Exit Theater Mode" : "Enter Theater Mode"}
               >
                 {isTheaterMode ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+              </button>
+
+              {/* Fullscreen Video Toggle */}
+              <button
+                onClick={toggleFullscreen}
+                className="p-2 rounded-full bg-white hover:bg-slate-50 border border-[#121417]/30 text-[#121417] transition-colors"
+                title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen Video"}
+              >
+                {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
               </button>
 
               {/* Watch on YouTube */}

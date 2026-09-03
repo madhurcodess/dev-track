@@ -8,6 +8,7 @@ import { AddCourseModal } from './components/AddCourseModal';
 import { LandingPage } from './components/LandingPage';
 import { PlaylistsView } from './components/PlaylistsView';
 import { CompactTimerBar } from './components/CompactTimerBar';
+import { TimerCelebrationModal } from './components/TimerCelebrationModal';
 import { formatTime } from './utils/youtube';
 import { SignedIn, SignedOut, useUser } from '@clerk/clerk-react';
 import { Home, PanelLeft, PanelRight } from 'lucide-react';
@@ -152,6 +153,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onBackToLanding }) => {
 
       {/* Add Course / YouTube Playlist Modal */}
       <AddCourseModal />
+
+      {/* Focus & Break Completion Celebration Modal */}
+      <TimerCelebrationModal />
 
       {/* Optional Back to Landing Page button in bottom left */}
       {onBackToLanding && (

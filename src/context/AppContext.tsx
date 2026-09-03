@@ -13,6 +13,11 @@ import {
   upsertUserStreakToCloud
 } from '../services/db';
 
+export interface TimerCelebrationState {
+  type: 'work' | 'break';
+  durationMinutes: number;
+}
+
 interface AppContextType {
   // Courses & Tracklist
   courses: Course[];
@@ -50,6 +55,13 @@ interface AppContextType {
   updatePomodoroSettings: (settings: Partial<PomodoroSettings>) => void;
   isPomodoroExpanded: boolean;
   setIsPomodoroExpanded: (expanded: boolean) => void;
+
+  // Timer Celebration Modal State & Actions
+  timerCelebration: TimerCelebrationState | null;
+  setTimerCelebration: (state: TimerCelebrationState | null) => void;
+  startNextSprint: () => void;
+  startBreakAfterWork: () => void;
+  extendBreak: (extraMinutes?: number) => void;
 
   // YouTube Player Ref and Sync
   ytPlayer: any;
@@ -122,6 +134,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({
   userId = null
 }) => {
   const [isCloudSyncing, setIsCloudSyncing] = useState<boolean>(false);
+  const [timerCelebration, setTimerCelebration] = useState<TimerCelebrationState | null>(null);
 
   // View Navigation: 'playlists' (hub) or 'workspace' (player & notes)
   const [currentView, setCurrentView] = useState<'playlists' | 'workspace'>('playlists');
@@ -588,9 +601,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({
 
     if (pomodoroMode === 'work') {
       confetti({
-        particleCount: 80,
-        spread: 60,
-        origin: { y: 0.7 },
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
       });
 
       const today = new Date().toISOString().split('T')[0];
@@ -609,17 +622,39 @@ export const AppProvider: React.FC<AppProviderProps> = ({
         return updated;
       });
 
-      // Switch to break
-      if ((pomodoroStats.sessionsCompleted + 1) % 4 === 0) {
-        handleSetPomodoroMode('longBreak');
-      } else {
-        handleSetPomodoroMode('shortBreak');
-      }
+      // Trigger Celebration Modal for deep work completion
+      setTimerCelebration({
+        type: 'work',
+        durationMinutes: pomodoroSettings.workDuration,
+      });
     } else {
-      // Break ended -> Back to work
-      handleSetPomodoroMode('work');
+      // Break ended -> Trigger Break Celebration Modal
+      setTimerCelebration({
+        type: 'break',
+        durationMinutes: pomodoroMode === 'shortBreak' ? pomodoroSettings.shortBreakDuration : pomodoroSettings.longBreakDuration,
+      });
     }
-  }, [pomodoroMode, pomodoroSettings, pomodoroStats.sessionsCompleted, handleSetPomodoroMode, userId]);
+  }, [pomodoroMode, pomodoroSettings, userId]);
+
+  const startBreakAfterWork = useCallback(() => {
+    setTimerCelebration(null);
+    const isLong = (pomodoroStats.sessionsCompleted) % 4 === 0 && pomodoroStats.sessionsCompleted > 0;
+    const breakMode = isLong ? 'longBreak' : 'shortBreak';
+    handleSetPomodoroMode(breakMode);
+    setIsPomodoroRunning(true);
+  }, [pomodoroStats.sessionsCompleted, handleSetPomodoroMode]);
+
+  const startNextSprint = useCallback(() => {
+    setTimerCelebration(null);
+    handleSetPomodoroMode('work');
+    setIsPomodoroRunning(true);
+  }, [handleSetPomodoroMode]);
+
+  const extendBreak = useCallback((extraMinutes: number = 5) => {
+    setTimerCelebration(null);
+    setPomodoroTimeLeft(extraMinutes * 60);
+    setIsPomodoroRunning(true);
+  }, []);
 
   const skipPomodoro = useCallback(() => {
     handleTimerComplete();
@@ -694,6 +729,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({
         updatePomodoroSettings,
         isPomodoroExpanded,
         setIsPomodoroExpanded,
+        timerCelebration,
+        setTimerCelebration,
+        startNextSprint,
+        startBreakAfterWork,
+        extendBreak,
         ytPlayer,
         setYtPlayer,
         seekTo,
