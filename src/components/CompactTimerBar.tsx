@@ -15,7 +15,8 @@ import {
   BrainCircuit,
   Coffee,
   Award,
-  Clock
+  Clock,
+  PanelRightClose
 } from 'lucide-react';
 
 export const CompactTimerBar: React.FC = () => {
@@ -31,6 +32,7 @@ export const CompactTimerBar: React.FC = () => {
     skipPomodoro,
     setPomodoroMode,
     updatePomodoroSettings,
+    setIsNotesOpen,
   } = useApp();
 
   // Dropdown state for the full Focus Engine container
@@ -122,6 +124,15 @@ export const CompactTimerBar: React.FC = () => {
               title={isExpanded ? "Close Focus Engine" : "Open Focus Engine Settings"}
             >
               <Settings className={`w-3.5 h-3.5 ${isExpanded ? 'animate-spin-slow' : ''}`} />
+            </button>
+
+            {/* Hide Notes Panel Button */}
+            <button
+              onClick={() => setIsNotesOpen(false)}
+              className="p-1.5 rounded-lg border border-[#121417]/20 text-[#121417]/60 hover:text-[#121417] hover:bg-slate-50 text-xs transition-colors"
+              title="Hide Notes Panel"
+            >
+              <PanelRightClose className="w-3.5 h-3.5" />
             </button>
 
             {/* Mini Streak Pill */}

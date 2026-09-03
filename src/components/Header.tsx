@@ -2,12 +2,7 @@ import React from 'react';
 import { useApp } from '../context/AppContext';
 import { 
   Plus, 
-  PanelLeftClose, 
-  PanelLeft, 
-  PanelRightClose, 
-  PanelRight, 
   Sparkles,
-  Cloud,
   LayoutGrid,
   Tv,
   Flame
@@ -19,14 +14,8 @@ export const Header: React.FC = () => {
   const {
     activeCourse,
     pomodoroStats,
-    isSidebarOpen,
-    setIsSidebarOpen,
-    isNotesOpen,
-    setIsNotesOpen,
     setIsAddModalOpen,
     hasClerkKey,
-    isCloudConnected,
-    isCloudSyncing,
     currentView,
     setCurrentView,
   } = useApp();
@@ -37,19 +26,8 @@ export const Header: React.FC = () => {
 
   return (
     <header className="sticky top-0 z-30 h-16 w-full border-b border-[#121417]/10 bg-[#F9F8F5]/95 backdrop-blur-md px-3 sm:px-5 lg:px-6 flex items-center justify-between gap-3">
-      {/* Left: Brand & Sidebar Toggle */}
+      {/* Left: Brand & View Switcher */}
       <div className="flex items-center gap-2 sm:gap-3 min-w-fit">
-        {/* Sidebar Toggle only in workspace view */}
-        {currentView === 'workspace' && (
-          <button
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2 rounded-full text-[#121417]/70 hover:text-[#121417] hover:bg-black/5 transition-colors"
-            title={isSidebarOpen ? "Hide Course Index" : "Show Course Index"}
-          >
-            {isSidebarOpen ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeft className="w-5 h-5" />}
-          </button>
-        )}
-
         {/* Custom Brand Logo - Click to go to Playlists */}
         <button 
           onClick={() => setCurrentView('playlists')}
@@ -117,7 +95,7 @@ export const Header: React.FC = () => {
         </div>
       )}
 
-      {/* Right: Actions, Badges & Profile (Upper Timer Box Removed) */}
+      {/* Right: Streak, Add Course, and Auth Profile */}
       <div className="flex items-center gap-2 sm:gap-3">
         {/* Focus Streak Badge */}
         <div 
@@ -127,17 +105,6 @@ export const Header: React.FC = () => {
           <Flame className="w-4 h-4 fill-current text-orange-500" />
           <span>{pomodoroStats.streakDays}d Streak</span>
         </div>
-
-        {/* Cloud Sync Badge */}
-        {isCloudConnected && (
-          <div 
-            className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-[#121417]/15 text-xs font-bold text-[#121417] shadow-sm"
-            title={isCloudSyncing ? "Syncing data with Supabase..." : "Supabase Cloud Database Connected"}
-          >
-            <Cloud className={`w-3.5 h-3.5 ${isCloudSyncing ? 'text-amber-500 animate-pulse' : 'text-emerald-600'}`} />
-            <span className="text-[11px]">{isCloudSyncing ? 'Syncing...' : 'Cloud Synced'}</span>
-          </div>
-        )}
 
         {/* Add Course Button */}
         <button
@@ -151,24 +118,6 @@ export const Header: React.FC = () => {
 
         {/* Clerk Authentication / Profile */}
         <AuthBar hasClerkKey={hasClerkKey} />
-
-        {/* Notes Toggle Button (only when in workspace view) */}
-        {currentView === 'workspace' && (
-          <>
-            <div className="w-[1px] h-5 bg-[#121417]/15 hidden sm:block mx-0.5" />
-            <button
-              onClick={() => setIsNotesOpen(!isNotesOpen)}
-              className={`p-2 rounded-full transition-colors ${
-                isNotesOpen 
-                  ? 'text-[#121417] bg-[#EBF755] border border-[#121417]/20 shadow-sm' 
-                  : 'text-[#121417]/60 hover:text-[#121417] hover:bg-black/5'
-              }`}
-              title={isNotesOpen ? "Hide Notes Workspace" : "Show Notes Workspace"}
-            >
-              {isNotesOpen ? <PanelRightClose className="w-5 h-5" /> : <PanelRight className="w-5 h-5" />}
-            </button>
-          </>
-        )}
       </div>
     </header>
   );

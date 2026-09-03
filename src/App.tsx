@@ -10,7 +10,7 @@ import { PlaylistsView } from './components/PlaylistsView';
 import { CompactTimerBar } from './components/CompactTimerBar';
 import { formatTime } from './utils/youtube';
 import { SignedIn, SignedOut, useUser } from '@clerk/clerk-react';
-import { Home } from 'lucide-react';
+import { Home, PanelLeft, PanelRight } from 'lucide-react';
 
 interface DashboardProps {
   onBackToLanding?: () => void;
@@ -107,11 +107,35 @@ const Dashboard: React.FC<DashboardProps> = ({ onBackToLanding }) => {
         <PlaylistsView />
       ) : (
         <div className="flex-1 flex min-h-0 relative overflow-hidden">
+          {/* Re-open Left Sidebar Tab (when collapsed) */}
+          {!isTheaterMode && !isSidebarOpen && (
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="absolute left-3 top-3 z-30 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white hover:bg-slate-50 border-2 border-[#121417] shadow-solid text-[#121417] text-xs font-black transition-all hover:scale-105 active:scale-95"
+              title="Show Playlist Index"
+            >
+              <PanelLeft className="w-3.5 h-3.5 text-[#121417]" />
+              <span>Playlist</span>
+            </button>
+          )}
+
           {/* Left Column: Tracklist & Course index */}
           {!isTheaterMode && <Sidebar />}
 
           {/* Center Workspace: Video Player & Controls */}
           <PlayerWorkspace />
+
+          {/* Re-open Right Notes & Timer Tab (when collapsed) */}
+          {!isTheaterMode && !isNotesOpen && (
+            <button
+              onClick={() => setIsNotesOpen(true)}
+              className="absolute right-3 top-3 z-30 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#EBF755] hover:bg-[#E2EF43] border-2 border-[#121417] shadow-solid text-black text-xs font-black transition-all hover:scale-105 active:scale-95"
+              title="Show Notes & Timer"
+            >
+              <PanelRight className="w-3.5 h-3.5 text-black" />
+              <span>Notes & Timer</span>
+            </button>
+          )}
 
           {/* Right Column: Timer container arranged directly above Contextual Notes area */}
           {!isTheaterMode && isNotesOpen && (

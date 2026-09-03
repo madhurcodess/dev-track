@@ -11,7 +11,8 @@ import {
   FolderPlus, 
   Layers, 
   ChevronDown, 
-  Clock 
+  Clock,
+  PanelLeftClose
 } from 'lucide-react';
 import { AdBanner } from './AdBanner';
 
@@ -27,6 +28,7 @@ export const Sidebar: React.FC = () => {
     deleteCourse,
     setIsAddModalOpen,
     isSidebarOpen,
+    setIsSidebarOpen,
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -37,7 +39,14 @@ export const Sidebar: React.FC = () => {
 
   if (!activeCourse || courses.length === 0) {
     return (
-      <aside className="w-80 sm:w-88 flex-shrink-0 h-[calc(100vh-4rem)] flex flex-col border-r border-[#121417]/10 bg-white p-6 items-center justify-center text-center">
+      <aside className="w-80 sm:w-88 flex-shrink-0 h-[calc(100vh-4rem)] flex flex-col border-r border-[#121417]/10 bg-white p-6 relative items-center justify-center text-center">
+        <button
+          onClick={() => setIsSidebarOpen(false)}
+          className="absolute top-4 right-4 p-1 rounded-lg text-[#121417]/50 hover:text-[#121417] hover:bg-black/5 transition-colors"
+          title="Hide Playlist Sidebar"
+        >
+          <PanelLeftClose className="w-4 h-4" />
+        </button>
         <div className="w-14 h-14 rounded-2xl bg-[#EBF755] border-2 border-[#121417] text-[#121417] flex items-center justify-center mb-4 shadow-solid">
           <FolderPlus className="w-7 h-7" />
         </div>
@@ -72,9 +81,18 @@ export const Sidebar: React.FC = () => {
     <aside className="w-80 sm:w-88 flex-shrink-0 h-[calc(100vh-4rem)] flex flex-col border-r border-[#121417]/10 bg-white">
       {/* Course Selector Dropdown */}
       <div className="p-4 border-b border-[#121417]/10 bg-[#F9F8F5]/50">
-        <label className="text-[11px] font-bold uppercase tracking-wider text-[#121417]/60 mb-1.5 block">
-          Current Playlist
-        </label>
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="text-[11px] font-bold uppercase tracking-wider text-[#121417]/60 block">
+            Current Playlist
+          </label>
+          <button
+            onClick={() => setIsSidebarOpen(false)}
+            className="p-1 rounded-lg text-[#121417]/50 hover:text-[#121417] hover:bg-black/5 transition-colors"
+            title="Hide Playlist Sidebar"
+          >
+            <PanelLeftClose className="w-4 h-4" />
+          </button>
+        </div>
         <div className="relative">
           <button
             onClick={() => setIsCourseDropdownOpen(!isCourseDropdownOpen)}
