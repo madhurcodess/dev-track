@@ -23,6 +23,7 @@ interface AppContextType {
   setActiveCourseId: (id: string) => void;
   setActiveVideoId: (id: string) => void;
   toggleVideoCompletion: (courseId: string, videoId: string) => void;
+  setVideoCompleted: (courseId: string, videoId: string, completed: boolean) => void;
   markCourseCompleted: (courseId: string, completed: boolean) => void;
   addCourse: (course: Course) => void;
   updateCourseVideos: (courseId: string, videos: VideoItem[], title?: string) => void;
@@ -73,9 +74,10 @@ interface AppContextType {
   currentView: 'playlists' | 'workspace';
   setCurrentView: (view: 'playlists' | 'workspace') => void;
 
-  // Playback Resume
-  savePlaybackPosition: (videoId: string, seconds: number) => void;
-  getPlaybackPosition: (videoId: string) => number;
+  // Playback Resume & Position Tracking (Indexed by courseId and videoId)
+  savePlaybackPosition: (courseId: string, videoId: string, seconds: number) => void;
+  getPlaybackPosition: (courseId: string, videoId: string) => number;
+  clearPlaybackPosition: (courseId: string, videoId: string) => void;
 
   // Cloud Sync
   isCloudConnected: boolean;
@@ -133,12 +135,13 @@ export const AppProvider: React.FC<AppProviderProps> = ({
     return {};
   });
 
-  const savePlaybackPosition = useCallback((videoId: string, seconds: number) => {
-    if (!videoId || seconds < 0) return;
+  const savePlaybackPosition = useCallback((courseId: string, videoId: string, seconds: number) => {
+    if (!courseId || !videoId || seconds < 0) return;
+    const key = `${courseId}::${videoId}`;
     setPlaybackPositions(prev => {
       // Don't save if position change is minimal (< 2s)
-      if (Math.abs((prev[videoId] || 0) - seconds) < 2) return prev;
-      const updated = { ...prev, [videoId]: Math.floor(seconds) };
+      if (Math.abs((prev[key] || 0) - seconds) < 2) return prev;
+      const updated = { ...prev, [key]: Math.floor(seconds) };
       try {
         localStorage.setItem(STORAGE_KEYS.PLAYBACK_POSITIONS, JSON.stringify(updated));
       } catch {}
@@ -146,9 +149,25 @@ export const AppProvider: React.FC<AppProviderProps> = ({
     });
   }, []);
 
-  const getPlaybackPosition = useCallback((videoId: string): number => {
-    return playbackPositions[videoId] || 0;
+  const getPlaybackPosition = useCallback((courseId: string, videoId: string): number => {
+    if (!courseId || !videoId) return 0;
+    const key = `${courseId}::${videoId}`;
+    return playbackPositions[key] || playbackPositions[videoId] || 0;
   }, [playbackPositions]);
+
+  const clearPlaybackPosition = useCallback((courseId: string, videoId: string) => {
+    if (!courseId || !videoId) return;
+    const key = `${courseId}::${videoId}`;
+    setPlaybackPositions(prev => {
+      const updated = { ...prev };
+      delete updated[key];
+      delete updated[videoId];
+      try {
+        localStorage.setItem(STORAGE_KEYS.PLAYBACK_POSITIONS, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  }, []);
 
   // 1. Courses State - Starts clean and empty
   const [courses, setCourses] = useState<Course[]>(() => {
@@ -362,6 +381,49 @@ export const AppProvider: React.FC<AppProviderProps> = ({
         }
         return updatedCourse;
       });
+      return updated;
+    });
+  }, [userId]);
+
+  // Set Video Completed (idempotent, triggers celebrations on first-time completion)
+  const setVideoCompleted = useCallback((courseId: string, videoId: string, completed: boolean) => {
+    setCourses(prev => {
+      let isFirstTime = false;
+      const updated = prev.map(c => {
+        if (c.id !== courseId) return c;
+        const currentVid = c.videos.find(v => v.id === videoId);
+        if (currentVid && currentVid.completed !== completed) {
+          if (completed) isFirstTime = true;
+        } else {
+          return c; // Already in target completed state
+        }
+
+        const updatedVideos = c.videos.map(v => {
+          if (v.id !== videoId) return v;
+          return { ...v, completed };
+        });
+
+        const updatedCourse = { ...c, videos: updatedVideos };
+        if (userId) {
+          upsertUserCourseToCloud(userId, updatedCourse);
+        }
+        return updatedCourse;
+      });
+
+      if (isFirstTime) {
+        soundManager.playCheck();
+        const course = prev.find(c => c.id === courseId);
+        const remaining = course ? course.videos.filter(x => x.id !== videoId && !x.completed) : [];
+        if (remaining.length === 0) {
+          soundManager.playSuccess();
+          confetti({
+            particleCount: 120,
+            spread: 70,
+            origin: { y: 0.6 }
+          });
+        }
+      }
+
       return updated;
     });
   }, [userId]);
@@ -609,6 +671,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({
         setActiveCourseId,
         setActiveVideoId,
         toggleVideoCompletion,
+        setVideoCompleted,
         markCourseCompleted,
         addCourse,
         updateCourseVideos,
@@ -650,6 +713,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({
         setCurrentView,
         savePlaybackPosition,
         getPlaybackPosition,
+        clearPlaybackPosition,
         isCloudConnected: isSupabaseConfigured,
         isCloudSyncing,
       }}

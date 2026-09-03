@@ -33,6 +33,7 @@ export const PlayerWorkspace: React.FC = () => {
     activeVideoId,
     setActiveVideoId,
     toggleVideoCompletion,
+    setVideoCompleted,
     setYtPlayer,
     isTheaterMode,
     setIsTheaterMode,
@@ -42,6 +43,7 @@ export const PlayerWorkspace: React.FC = () => {
     updateCourseVideos,
     savePlaybackPosition,
     getPlaybackPosition,
+    clearPlaybackPosition,
     setCurrentView,
   } = useApp();
 
@@ -52,35 +54,61 @@ export const PlayerWorkspace: React.FC = () => {
   const [currentTimeSec, setCurrentTimeSec] = useState<number>(0);
   const [videoDurationSec, setVideoDurationSec] = useState<number>(0);
   const [playerStatus, setPlayerStatus] = useState<'playing' | 'paused' | 'ready' | 'loading'>('loading');
-  const [resumeMessage, setResumeMessage] = useState<string | null>(null);
+  
+  // Persistent Playback & Auto-completion Feedback
+  const [resumeBanner, setResumeBanner] = useState<{ seconds: number; formatted: string } | null>(null);
+  const [completionToast, setCompletionToast] = useState<string | null>(null);
   const hasAttemptedResumeRef = useRef<string | null>(null);
+  const lastSavedSecRef = useRef<number>(0);
 
   const currentIndex = activeCourse ? activeCourse.videos.findIndex(v => v.id === activeVideoId) : -1;
   const hasPrevious = currentIndex > 0;
   const hasNext = activeCourse ? currentIndex < activeCourse.videos.length - 1 : false;
 
-  // Check and resume playback position
+  // Check and resume playback position (isolated by courseId and videoId)
   const checkAndResumePlayback = useCallback((player: any) => {
-    if (!activeVideo || !player || typeof player.seekTo !== 'function') return;
-    if (hasAttemptedResumeRef.current === activeVideo.id) return;
+    if (!activeCourse || !activeVideo || !player || typeof player.seekTo !== 'function') return;
+    const trackingKey = `${activeCourse.id}::${activeVideo.id}`;
+    if (hasAttemptedResumeRef.current === trackingKey) return;
 
-    const savedSec = getPlaybackPosition(activeVideo.id);
+    const savedSec = getPlaybackPosition(activeCourse.id, activeVideo.id);
     const dur = typeof player.getDuration === 'function' ? player.getDuration() : 0;
 
-    // Only resume if saved position > 5 seconds and not in the last 10 seconds
-    if (savedSec > 5 && (!dur || savedSec < dur - 10)) {
+    // Edge case: if video is completed or near the end (>= 90%), clear and start from 0
+    if (activeVideo.completed || (dur > 0 && savedSec >= dur * 0.90)) {
+      clearPlaybackPosition(activeCourse.id, activeVideo.id);
+      hasAttemptedResumeRef.current = trackingKey;
+      return;
+    }
+
+    // Only resume if saved position > 5 seconds
+    if (savedSec > 5) {
       try {
         player.seekTo(savedSec, true);
-        hasAttemptedResumeRef.current = activeVideo.id;
-        setResumeMessage(`Resumed from ${formatTime(savedSec)}`);
-        setTimeout(() => setResumeMessage(null), 4000);
+        hasAttemptedResumeRef.current = trackingKey;
+        setResumeBanner({ seconds: savedSec, formatted: formatTime(savedSec) });
+        setTimeout(() => {
+          setResumeBanner(curr => (curr?.seconds === savedSec ? null : curr));
+        }, 8000);
       } catch (e) {
         console.warn('Playback resume notice:', e);
       }
     } else {
-      hasAttemptedResumeRef.current = activeVideo.id;
+      hasAttemptedResumeRef.current = trackingKey;
     }
-  }, [activeVideo, getPlaybackPosition]);
+  }, [activeCourse, activeVideo, getPlaybackPosition, clearPlaybackPosition]);
+
+  // "Start Over" user action
+  const handleStartOver = useCallback(() => {
+    if (playerInstanceRef.current && typeof playerInstanceRef.current.seekTo === 'function') {
+      playerInstanceRef.current.seekTo(0, true);
+    }
+    if (activeCourse && activeVideo) {
+      clearPlaybackPosition(activeCourse.id, activeVideo.id);
+      lastSavedSecRef.current = 0;
+    }
+    setResumeBanner(null);
+  }, [activeCourse, activeVideo, clearPlaybackPosition]);
 
   // Sync real playlist videos from YouTube iFrame API
   const syncPlaylistIfAvailable = useCallback((player: any) => {
@@ -90,7 +118,6 @@ export const PlayerWorkspace: React.FC = () => {
       const videoData = typeof player.getVideoData === 'function' ? player.getVideoData() : null;
 
       if (playlist && playlist.length > 0) {
-        // Check if videos in activeCourse need to be synced with real YouTube video IDs
         const hasDummyId = activeCourse.videos.some(v => v.youtubeId === 'dQw4w9WgXcQ' || !v.youtubeId);
         const needsUpdate = hasDummyId || activeCourse.videos.length !== playlist.length;
 
@@ -181,9 +208,7 @@ export const PlayerWorkspace: React.FC = () => {
             try {
               setVideoDurationSec(event.target.getDuration() || 0);
             } catch {}
-            // Sync playlist lectures on ready
             syncPlaylistIfAvailable(event.target);
-            // Resume playback if position is saved
             checkAndResumePlayback(event.target);
           },
           onStateChange: (event: any) => {
@@ -193,12 +218,23 @@ export const PlayerWorkspace: React.FC = () => {
               checkAndResumePlayback(event.target);
             } else if (event.data === 2) {
               setPlayerStatus('paused');
-            } else if (event.data === 0) {
-              // Video ended -> Auto mark completed!
-              if (activeVideo && !activeVideo.completed && activeCourse) {
-                toggleVideoCompletion(activeCourse.id, activeVideo.id);
+              // Save exact offset on pause
+              if (activeCourse && activeVideo && typeof event.target.getCurrentTime === 'function') {
+                const pSec = Math.floor(event.target.getCurrentTime());
+                if (pSec > 3) {
+                  savePlaybackPosition(activeCourse.id, activeVideo.id, pSec);
+                  lastSavedSecRef.current = pSec;
+                }
               }
+            } else if (event.data === 0) {
+              // Video ended -> Auto mark completed & clear saved position
               setPlayerStatus('paused');
+              if (activeCourse && activeVideo) {
+                setVideoCompleted(activeCourse.id, activeVideo.id, true);
+                clearPlaybackPosition(activeCourse.id, activeVideo.id);
+                setCompletionToast('Lecture completed! 🎉');
+                setTimeout(() => setCompletionToast(null), 4500);
+              }
             }
           },
         },
@@ -211,7 +247,6 @@ export const PlayerWorkspace: React.FC = () => {
         playerConfig.videoId = activeVideo.youtubeId;
       }
 
-      // Create new player
       playerInstanceRef.current = new window.YT.Player('youtube-player-element', playerConfig);
       setYtPlayer(playerInstanceRef.current);
     };
@@ -229,7 +264,7 @@ export const PlayerWorkspace: React.FC = () => {
       initPlayer();
     }
 
-    // Polling current playback time for display, timestamp capture & position persistence
+    // Polling current playback time (1s tick) for accurate time display, 2-3s auto-save, and 90% auto-completion
     checkInterval = window.setInterval(() => {
       if (playerInstanceRef.current && typeof playerInstanceRef.current.getCurrentTime === 'function') {
         try {
@@ -237,14 +272,28 @@ export const PlayerWorkspace: React.FC = () => {
           const sec = Math.floor(t);
           setCurrentTimeSec(sec);
 
-          const dur = playerInstanceRef.current.getDuration();
-          if (dur && dur > 0) {
-            setVideoDurationSec(Math.floor(dur));
+          const dur = typeof playerInstanceRef.current.getDuration === 'function' 
+            ? Math.floor(playerInstanceRef.current.getDuration()) 
+            : 0;
+          if (dur > 0) {
+            setVideoDurationSec(dur);
           }
 
-          // Auto-save playback position for seamless resume
-          if (activeVideo && sec > 3) {
-            savePlaybackPosition(activeVideo.id, sec);
+          if (activeCourse && activeVideo && dur > 0 && sec > 0) {
+            // 1. Completion Trigger: 90% or higher
+            const progressRatio = sec / dur;
+            if (progressRatio >= 0.90 && !activeVideo.completed) {
+              setVideoCompleted(activeCourse.id, activeVideo.id, true);
+              clearPlaybackPosition(activeCourse.id, activeVideo.id);
+              setCompletionToast('Lecture completed! (90% watched) 🎉');
+              setTimeout(() => setCompletionToast(null), 4500);
+            } else if (!activeVideo.completed && sec > 3) {
+              // 2. Periodically save every 2–3 seconds during active playback
+              if (Math.abs(sec - lastSavedSecRef.current) >= 2) {
+                savePlaybackPosition(activeCourse.id, activeVideo.id, sec);
+                lastSavedSecRef.current = sec;
+              }
+            }
           }
         } catch {}
       }
@@ -258,7 +307,8 @@ export const PlayerWorkspace: React.FC = () => {
     activeCourse?.playlistId, 
     activeVideo?.youtubeId, 
     setYtPlayer, 
-    toggleVideoCompletion, 
+    setVideoCompleted,
+    clearPlaybackPosition,
     syncPlaylistIfAvailable, 
     syncVideoMetadata,
     checkAndResumePlayback,
@@ -270,6 +320,8 @@ export const PlayerWorkspace: React.FC = () => {
   useEffect(() => {
     if (!playerInstanceRef.current) return;
     hasAttemptedResumeRef.current = null; // Reset for new video
+    lastSavedSecRef.current = 0;
+    setResumeBanner(null);
 
     if (activeCourse?.playlistId && typeof playerInstanceRef.current.playVideoAt === 'function') {
       const idx = activeCourse.videos.findIndex(v => v.id === activeVideo?.id);
@@ -374,14 +426,48 @@ export const PlayerWorkspace: React.FC = () => {
               {activeCourse.title}
             </span>
           </button>
-
-          {resumeMessage && (
-            <span className="animate-fade-in flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold bg-[#EBF755] border border-[#121417]/20 text-[#121417] shadow-xs">
-              <RotateCcw className="w-3 h-3" />
-              {resumeMessage}
-            </span>
-          )}
         </div>
+
+        {/* Dynamic Alert Toasts: Playback Resume with "Start Over" & Completion Notification */}
+        {completionToast && (
+          <div className="animate-fade-in flex items-center justify-between gap-3 px-4 py-2.5 rounded-2xl bg-[#EBF755] text-black border-2 border-[#121417] shadow-solid mb-3">
+            <div className="flex items-center gap-2 text-xs font-black">
+              <Sparkles className="w-4 h-4 fill-current text-black" />
+              <span>{completionToast}</span>
+            </div>
+            <button
+              onClick={() => setCompletionToast(null)}
+              className="text-black/60 hover:text-black p-1 text-xs font-black"
+              title="Close"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {resumeBanner && (
+          <div className="animate-fade-in flex items-center justify-between gap-3 px-4 py-2.5 rounded-2xl bg-[#121417] text-[#EBF755] border-2 border-[#121417] shadow-solid mb-3">
+            <div className="flex items-center gap-2 text-xs font-bold">
+              <RotateCcw className="w-4 h-4 text-[#EBF755]" />
+              <span>Resumed playback from <strong className="underline decoration-[#EBF755] font-mono text-white ml-0.5">{resumeBanner.formatted}</strong></span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleStartOver}
+                className="px-3 py-1 rounded-full text-xs font-black bg-[#EBF755] text-black hover:bg-white transition-all shadow-xs active:scale-95"
+              >
+                Start Over
+              </button>
+              <button
+                onClick={() => setResumeBanner(null)}
+                className="text-white/60 hover:text-white p-1 text-xs"
+                title="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* 16:9 Responsive Video Aspect Ratio */}
         <div className="relative w-full rounded-3xl overflow-hidden shadow-solid-lg border-2 border-[#121417] bg-black aspect-video group">
@@ -436,7 +522,7 @@ export const PlayerWorkspace: React.FC = () => {
                 <span>Timestamp Note [{formatTime(currentTimeSec)}]</span>
               </button>
 
-              {/* Mark Completed */}
+              {/* Mark Completed Toggle */}
               <button
                 onClick={() => toggleVideoCompletion(activeCourse.id, activeVideo.id)}
                 className={`flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-bold border-2 border-[#121417] transition-all hover:scale-105 ${
