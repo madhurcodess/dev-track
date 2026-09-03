@@ -8,7 +8,7 @@ import { PomodoroTimer } from './components/PomodoroTimer';
 import { AddCourseModal } from './components/AddCourseModal';
 import { LandingPage } from './components/LandingPage';
 import { formatTime } from './utils/youtube';
-import { SignedIn, SignedOut } from '@clerk/clerk-react';
+import { SignedIn, SignedOut, useUser } from '@clerk/clerk-react';
 import { Home } from 'lucide-react';
 
 interface DashboardProps {
@@ -136,23 +136,25 @@ const Dashboard: React.FC<DashboardProps> = ({ onBackToLanding }) => {
 export function App({ hasClerkKey = false }: { hasClerkKey?: boolean }) {
   const [guestView, setGuestView] = useState<'landing' | 'workspace'>('landing');
 
-  // If Clerk is fully active, use Clerk's SignedIn / SignedOut routing
+  // If Clerk is fully active, use Clerk's SignedIn / SignedOut routing with user sync
   if (hasClerkKey) {
     return (
-      <AppProvider hasClerkKey={true}>
+      <>
         <SignedOut>
-          <LandingPage hasClerkKey={true} onEnterDemo={() => {}} />
+          <AppProvider hasClerkKey={true} userId={null}>
+            <LandingPage hasClerkKey={true} onEnterDemo={() => {}} />
+          </AppProvider>
         </SignedOut>
         <SignedIn>
-          <Dashboard />
+          <SignedInWorkspace />
         </SignedIn>
-      </AppProvider>
+      </>
     );
   }
 
   // Fallback demo/preview mode before Clerk key is supplied
   return (
-    <AppProvider hasClerkKey={false}>
+    <AppProvider hasClerkKey={false} userId={null}>
       {guestView === 'landing' ? (
         <LandingPage 
           hasClerkKey={false} 
@@ -164,5 +166,14 @@ export function App({ hasClerkKey = false }: { hasClerkKey?: boolean }) {
     </AppProvider>
   );
 }
+
+const SignedInWorkspace: React.FC = () => {
+  const { user } = useUser();
+  return (
+    <AppProvider hasClerkKey={true} userId={user?.id || null}>
+      <Dashboard />
+    </AppProvider>
+  );
+};
 
 export default App;

@@ -90,6 +90,19 @@ class SoundManager {
       // Ignore
     }
   }
+
+  // Aliases for intuitive calls
+  playCheck() {
+    this.playClick();
+  }
+
+  playStart() {
+    this.playClick();
+  }
+
+  playAlarm() {
+    this.playChime();
+  }
 }
 
 export const soundManager = new SoundManager();

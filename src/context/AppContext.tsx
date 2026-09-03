@@ -2,6 +2,16 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import type { Course, VideoItem, PomodoroMode, PomodoroSettings, PomodoroStats } from '../types';
 import { soundManager } from '../utils/audio';
 import confetti from 'canvas-confetti';
+import { isSupabaseConfigured } from '../lib/supabase';
+import { 
+  fetchUserCoursesFromCloud, 
+  upsertUserCourseToCloud, 
+  deleteUserCourseFromCloud,
+  fetchUserNotesFromCloud,
+  upsertUserNoteToCloud,
+  fetchUserStreakFromCloud,
+  upsertUserStreakToCloud
+} from '../services/db';
 
 interface AppContextType {
   // Courses & Tracklist
@@ -58,6 +68,10 @@ interface AppContextType {
   isAddModalOpen: boolean;
   setIsAddModalOpen: (open: boolean) => void;
   hasClerkKey: boolean;
+
+  // Cloud Sync
+  isCloudConnected: boolean;
+  isCloudSyncing: boolean;
 }
 
 const STORAGE_KEYS = {
@@ -85,10 +99,19 @@ const DEFAULT_POMO_STATS: PomodoroStats = {
 
 const AppContext = createContext<AppContextType | null>(null);
 
-export const AppProvider: React.FC<{ children: React.ReactNode; hasClerkKey?: boolean }> = ({ 
+export interface AppProviderProps {
+  children: React.ReactNode;
+  hasClerkKey?: boolean;
+  userId?: string | null;
+}
+
+export const AppProvider: React.FC<AppProviderProps> = ({ 
   children, 
-  hasClerkKey = false 
+  hasClerkKey = false,
+  userId = null
 }) => {
+  const [isCloudSyncing, setIsCloudSyncing] = useState<boolean>(false);
+
   // 1. Courses State - Starts clean and empty
   const [courses, setCourses] = useState<Course[]>(() => {
     try {
@@ -136,7 +159,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode; hasClerkKey?: bo
   const [pomodoroSettings, setPomodoroSettings] = useState<PomodoroSettings>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.POMODORO_SETTINGS);
-      if (saved) return { ...DEFAULT_POMO_SETTINGS, ...JSON.parse(saved) };
+      if (saved) return JSON.parse(saved);
     } catch {}
     return DEFAULT_POMO_SETTINGS;
   });
@@ -144,7 +167,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode; hasClerkKey?: bo
   const [pomodoroStats, setPomodoroStats] = useState<PomodoroStats>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.POMODORO_STATS);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const today = new Date().toISOString().split('T')[0];
+        if (parsed.lastActiveDate !== today) {
+          return {
+            ...parsed,
+            todayFocusMinutes: 0,
+            lastActiveDate: today,
+          };
+        }
+        return parsed;
+      }
     } catch {}
     return DEFAULT_POMO_STATS;
   });
@@ -154,17 +188,67 @@ export const AppProvider: React.FC<{ children: React.ReactNode; hasClerkKey?: bo
   const [isPomodoroRunning, setIsPomodoroRunning] = useState<boolean>(false);
   const [isPomodoroExpanded, setIsPomodoroExpanded] = useState<boolean>(false);
 
-  // 4. YouTube Player instance
+  // 4. YouTube Player API Reference
   const [ytPlayer, setYtPlayer] = useState<any>(null);
   const [playerState, setPlayerState] = useState<string>('unstarted');
 
-  // 5. Layout State
+  // 5. UI Layout toggles
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [isNotesOpen, setIsNotesOpen] = useState<boolean>(true);
   const [isTheaterMode, setIsTheaterMode] = useState<boolean>(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
 
-  // Save courses to localStorage
+  // --- Cloud Sync Effect (Supabase) ---
+  useEffect(() => {
+    if (!userId || !isSupabaseConfigured) return;
+    let isSubscribed = true;
+
+    const syncFromCloud = async () => {
+      setIsCloudSyncing(true);
+      try {
+        // 1. Fetch courses from Supabase
+        const cloudCourses = await fetchUserCoursesFromCloud(userId);
+        if (isSubscribed && cloudCourses !== null) {
+          if (cloudCourses.length > 0) {
+            setCourses(cloudCourses);
+            setActiveCourseIdState(cloudCourses[0].id);
+            if (cloudCourses[0].videos[0]) {
+              setActiveVideoIdState(cloudCourses[0].videos[0].id);
+            }
+          } else if (courses.length > 0) {
+            // First-time sync: migrate local courses to cloud!
+            for (const c of courses) {
+              await upsertUserCourseToCloud(userId, c);
+            }
+          }
+        }
+
+        // 2. Fetch notes from Supabase
+        const cloudNotes = await fetchUserNotesFromCloud(userId);
+        if (isSubscribed && cloudNotes !== null) {
+          setNotes(prev => ({ ...prev, ...cloudNotes }));
+        }
+
+        // 3. Fetch Pomodoro streak from Supabase
+        const cloudStreak = await fetchUserStreakFromCloud(userId);
+        if (isSubscribed && cloudStreak !== null) {
+          setPomodoroStats(cloudStreak);
+        }
+      } catch (err) {
+        console.warn('Cloud sync error:', err);
+      } finally {
+        if (isSubscribed) setIsCloudSyncing(false);
+      }
+    };
+
+    syncFromCloud();
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [userId]);
+
+  // Persist courses to localStorage
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEYS.COURSES, JSON.stringify(courses));
@@ -214,13 +298,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode; hasClerkKey?: bo
   // Toggle Video Completion
   const toggleVideoCompletion = useCallback((courseId: string, videoId: string) => {
     setCourses(prev => {
-      return prev.map(c => {
+      const updated = prev.map(c => {
         if (c.id !== courseId) return c;
         const updatedVideos = c.videos.map(v => {
           if (v.id !== videoId) return v;
           const nextCompleted = !v.completed;
           if (nextCompleted) {
-            // Check if completing this makes the whole course completed!
             const remaining = c.videos.filter(x => x.id !== videoId && !x.completed);
             if (remaining.length === 0) {
               soundManager.playSuccess();
@@ -230,29 +313,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode; hasClerkKey?: bo
                 origin: { y: 0.6 }
               });
             } else {
-              soundManager.playClick();
+              soundManager.playCheck();
             }
           }
           return { ...v, completed: nextCompleted };
         });
-        return { ...c, videos: updatedVideos };
+        const updatedCourse = { ...c, videos: updatedVideos };
+        if (userId) {
+          upsertUserCourseToCloud(userId, updatedCourse);
+        }
+        return updatedCourse;
       });
+      return updated;
     });
-  }, []);
+  }, [userId]);
 
   const markCourseCompleted = useCallback((courseId: string, completed: boolean) => {
     setCourses(prev => prev.map(c => {
       if (c.id !== courseId) return c;
-      return {
+      const updated = {
         ...c,
         videos: c.videos.map(v => ({ ...v, completed }))
       };
+      if (userId) {
+        upsertUserCourseToCloud(userId, updated);
+      }
+      return updated;
     }));
     if (completed) {
       soundManager.playSuccess();
       confetti({ particleCount: 100, spread: 80, origin: { y: 0.5 } });
     }
-  }, []);
+  }, [userId]);
 
   // Add custom course
   const addCourse = useCallback((newCourse: Course) => {
@@ -261,19 +353,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode; hasClerkKey?: bo
     if (newCourse.videos[0]) {
       setActiveVideoId(newCourse.videos[0].id);
     }
-  }, [setActiveCourseId, setActiveVideoId]);
+    if (userId) {
+      upsertUserCourseToCloud(userId, newCourse);
+    }
+  }, [setActiveCourseId, setActiveVideoId, userId]);
 
   // Update course videos dynamically (e.g. when synced from YouTube playlist API)
   const updateCourseVideos = useCallback((courseId: string, updatedVideos: VideoItem[], updatedTitle?: string) => {
     setCourses(prev => prev.map(c => {
       if (c.id !== courseId) return c;
-      return {
+      const updated = {
         ...c,
         title: updatedTitle || c.title,
         videos: updatedVideos,
       };
+      if (userId) {
+        upsertUserCourseToCloud(userId, updated);
+      }
+      return updated;
     }));
-  }, []);
+  }, [userId]);
 
   // Delete course
   const deleteCourse = useCallback((courseId: string) => {
@@ -291,7 +390,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode; hasClerkKey?: bo
         setActiveVideoIdState('');
       }
     }
-  }, [activeCourseId, courses, setActiveCourseId]);
+    if (userId) {
+      deleteUserCourseFromCloud(userId, courseId);
+    }
+  }, [activeCourseId, courses, setActiveCourseId, userId]);
 
   // Reset all to empty
   const resetAllData = useCallback(() => {
@@ -328,133 +430,132 @@ export const AppProvider: React.FC<{ children: React.ReactNode; hasClerkKey?: bo
     }
     saveTimeoutRef.current = window.setTimeout(() => {
       setIsNoteSaving(false);
-      const now = new Date();
-      setLastSavedTime(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      setLastSavedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      // Sync note to cloud
+      if (userId && activeVideo) {
+        upsertUserNoteToCloud(userId, activeVideo.id, content);
+      }
     }, 600);
-  }, [currentNoteKey]);
+  }, [currentNoteKey, userId, activeVideo]);
 
-  // Pomodoro timer tick loop
-  useEffect(() => {
-    let interval: number | null = null;
-    if (isPomodoroRunning) {
-      interval = window.setInterval(() => {
-        setPomodoroTimeLeft(prev => {
-          if (prev <= 1) {
-            // Mode completed!
-            if (pomodoroSettings.soundEnabled) {
-              soundManager.playChime();
-            }
-            confetti({ particleCount: 60, spread: 60, origin: { y: 0.2 } });
-
-            // Update stats if finishing a work session
-            if (pomodoroMode === 'work') {
-              setPomodoroStats(cur => {
-                const today = new Date().toISOString().split('T')[0];
-                const streak = cur.lastActiveDate === today ? cur.streakDays : cur.streakDays + 1;
-                return {
-                  sessionsCompleted: cur.sessionsCompleted + 1,
-                  todayFocusMinutes: cur.todayFocusMinutes + pomodoroSettings.workDuration,
-                  streakDays: streak,
-                  lastActiveDate: today,
-                };
-              });
-              // Transition to short break or long break
-              const nextMode = (pomodoroStats.sessionsCompleted + 1) % 4 === 0 ? 'longBreak' : 'shortBreak';
-              setPomodoroMode(nextMode);
-              return (nextMode === 'longBreak' ? pomodoroSettings.longBreakDuration : pomodoroSettings.shortBreakDuration) * 60;
-            } else {
-              // Break finished -> switch back to work
-              setPomodoroMode('work');
-              return pomodoroSettings.workDuration * 60;
-            }
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isPomodoroRunning, pomodoroMode, pomodoroSettings, pomodoroStats.sessionsCompleted]);
+  // Pomodoro Actions
+  const timerIntervalRef = useRef<number | null>(null);
 
   const startPomodoro = useCallback(() => {
-    soundManager.playClick();
     setIsPomodoroRunning(true);
-  }, []);
+    if (pomodoroSettings.soundEnabled) {
+      soundManager.playStart();
+    }
+  }, [pomodoroSettings.soundEnabled]);
 
   const pausePomodoro = useCallback(() => {
-    soundManager.playClick();
     setIsPomodoroRunning(false);
   }, []);
 
   const resetPomodoro = useCallback(() => {
-    soundManager.playClick();
     setIsPomodoroRunning(false);
-    const duration =
-      pomodoroMode === 'work'
-        ? pomodoroSettings.workDuration
-        : pomodoroMode === 'shortBreak'
-        ? pomodoroSettings.shortBreakDuration
-        : pomodoroSettings.longBreakDuration;
-    setPomodoroTimeLeft(duration * 60);
-  }, [pomodoroMode, pomodoroSettings]);
-
-  const skipPomodoro = useCallback(() => {
-    soundManager.playClick();
-    setIsPomodoroRunning(false);
-    const nextMode: PomodoroMode = pomodoroMode === 'work' ? 'shortBreak' : 'work';
-    setPomodoroMode(nextMode);
-    const duration = nextMode === 'work' ? pomodoroSettings.workDuration : pomodoroSettings.shortBreakDuration;
+    const duration = pomodoroMode === 'work' 
+      ? pomodoroSettings.workDuration 
+      : pomodoroMode === 'shortBreak' 
+      ? pomodoroSettings.shortBreakDuration 
+      : pomodoroSettings.longBreakDuration;
     setPomodoroTimeLeft(duration * 60);
   }, [pomodoroMode, pomodoroSettings]);
 
   const handleSetPomodoroMode = useCallback((mode: PomodoroMode) => {
-    soundManager.playClick();
     setPomodoroMode(mode);
     setIsPomodoroRunning(false);
-    const duration =
-      mode === 'work'
-        ? pomodoroSettings.workDuration
-        : mode === 'shortBreak'
-        ? pomodoroSettings.shortBreakDuration
-        : pomodoroSettings.longBreakDuration;
+    const duration = mode === 'work' 
+      ? pomodoroSettings.workDuration 
+      : mode === 'shortBreak' 
+      ? pomodoroSettings.shortBreakDuration 
+      : pomodoroSettings.longBreakDuration;
     setPomodoroTimeLeft(duration * 60);
   }, [pomodoroSettings]);
 
   const updatePomodoroSettings = useCallback((newSettings: Partial<PomodoroSettings>) => {
     setPomodoroSettings(prev => {
       const updated = { ...prev, ...newSettings };
-      // update time left if currently in that mode and paused
-      if (!isPomodoroRunning) {
-        if (pomodoroMode === 'work' && newSettings.workDuration) {
-          setPomodoroTimeLeft(newSettings.workDuration * 60);
-        } else if (pomodoroMode === 'shortBreak' && newSettings.shortBreakDuration) {
-          setPomodoroTimeLeft(newSettings.shortBreakDuration * 60);
-        } else if (pomodoroMode === 'longBreak' && newSettings.longBreakDuration) {
-          setPomodoroTimeLeft(newSettings.longBreakDuration * 60);
-        }
-      }
       return updated;
     });
-  }, [isPomodoroRunning, pomodoroMode]);
+  }, []);
 
-  // YouTube API Player seek helper
+  const handleTimerComplete = useCallback(() => {
+    setIsPomodoroRunning(false);
+    if (pomodoroSettings.soundEnabled) {
+      soundManager.playAlarm();
+    }
+
+    if (pomodoroMode === 'work') {
+      confetti({
+        particleCount: 80,
+        spread: 60,
+        origin: { y: 0.7 },
+      });
+
+      const today = new Date().toISOString().split('T')[0];
+      setPomodoroStats(prev => {
+        const isConsecutiveDay = prev.lastActiveDate !== today;
+        const newStreak = isConsecutiveDay ? prev.streakDays + 1 : prev.streakDays;
+        const updated = {
+          sessionsCompleted: prev.sessionsCompleted + 1,
+          todayFocusMinutes: prev.todayFocusMinutes + pomodoroSettings.workDuration,
+          streakDays: newStreak,
+          lastActiveDate: today,
+        };
+        if (userId) {
+          upsertUserStreakToCloud(userId, updated);
+        }
+        return updated;
+      });
+
+      // Switch to break
+      if ((pomodoroStats.sessionsCompleted + 1) % 4 === 0) {
+        handleSetPomodoroMode('longBreak');
+      } else {
+        handleSetPomodoroMode('shortBreak');
+      }
+    } else {
+      // Break ended -> Back to work
+      handleSetPomodoroMode('work');
+    }
+  }, [pomodoroMode, pomodoroSettings, pomodoroStats.sessionsCompleted, handleSetPomodoroMode, userId]);
+
+  const skipPomodoro = useCallback(() => {
+    handleTimerComplete();
+  }, [handleTimerComplete]);
+
+  // Pomodoro countdown timer tick
+  useEffect(() => {
+    if (isPomodoroRunning) {
+      timerIntervalRef.current = window.setInterval(() => {
+        setPomodoroTimeLeft(prev => {
+          if (prev <= 1) {
+            handleTimerComplete();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    }
+
+    return () => {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    };
+  }, [isPomodoroRunning, handleTimerComplete]);
+
+  // YouTube Controller helper
   const seekTo = useCallback((seconds: number) => {
     if (ytPlayer && typeof ytPlayer.seekTo === 'function') {
       ytPlayer.seekTo(seconds, true);
-      if (typeof ytPlayer.playVideo === 'function') {
-        ytPlayer.playVideo();
-      }
     }
   }, [ytPlayer]);
 
   const getCurrentPlayerTime = useCallback((): number => {
     if (ytPlayer && typeof ytPlayer.getCurrentTime === 'function') {
-      try {
-        return Math.floor(ytPlayer.getCurrentTime());
-      } catch {
-        return 0;
-      }
+      return Math.floor(ytPlayer.getCurrentTime());
     }
     return 0;
   }, [ytPlayer]);
@@ -507,6 +608,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode; hasClerkKey?: bo
         isAddModalOpen,
         setIsAddModalOpen,
         hasClerkKey,
+        isCloudConnected: isSupabaseConfigured,
+        isCloudSyncing,
       }}
     >
       {children}

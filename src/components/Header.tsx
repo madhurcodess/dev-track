@@ -12,7 +12,8 @@ import {
   PanelLeft, 
   PanelRightClose, 
   PanelRight, 
-  Sparkles
+  Sparkles,
+  Cloud
 } from 'lucide-react';
 import { AuthBar } from './AuthBar';
 
@@ -35,6 +36,8 @@ export const Header: React.FC = () => {
     setIsAddModalOpen,
     resetAllData,
     hasClerkKey,
+    isCloudConnected,
+    isCloudSyncing,
   } = useApp();
 
   const totalVideos = activeCourse?.videos.length || 0;
@@ -163,6 +166,17 @@ export const Header: React.FC = () => {
           <Flame className="w-4 h-4 fill-current text-orange-500" />
           <span>{pomodoroStats.streakDays}d Streak</span>
         </div>
+
+        {/* Cloud Sync Badge */}
+        {isCloudConnected && (
+          <div 
+            className="hidden 2xl:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-[#121417]/15 text-xs font-bold text-[#121417] shadow-sm"
+            title={isCloudSyncing ? "Syncing data with Supabase..." : "Supabase Cloud Database Connected"}
+          >
+            <Cloud className={`w-3.5 h-3.5 ${isCloudSyncing ? 'text-amber-500 animate-pulse' : 'text-emerald-600'}`} />
+            <span className="text-[11px]">{isCloudSyncing ? 'Syncing...' : 'Cloud Synced'}</span>
+          </div>
+        )}
 
         {/* Add Course Button */}
         <button
