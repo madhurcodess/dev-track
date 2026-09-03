@@ -87,11 +87,11 @@ export const Header: React.FC = () => {
 
         {/* Buy a Coffee For Developer Button */}
         <a
-          href={import.meta.env.VITE_BUY_ME_COFFEE_URL || "https://buymeacoffee.com"}
+          href={import.meta.env.VITE_BUY_ME_COFFEE_URL || "https://buymeacoffee.com/madhurcodess"}
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-1.5 text-xs font-black px-3.5 py-2 rounded-full bg-[#FFF4D4] hover:bg-[#FFE8A3] border border-amber-300 text-amber-950 transition-all shadow-xs hover:scale-105 active:scale-95"
-          title="Fuel the developer with caffeine to squash bugs and ship new features! (Add your donation link in .env anytime)"
+          title="Support the developer on Buy Me a Coffee!"
         >
           <Coffee className="w-3.5 h-3.5 text-amber-800" />
           <span className="hidden md:inline">Fuel The Dev ☕</span>
