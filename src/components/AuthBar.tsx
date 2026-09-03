@@ -4,8 +4,7 @@ import {
   SignedOut, 
   SignInButton, 
   SignUpButton, 
-  UserButton,
-  useUser
+  UserButton 
 } from '@clerk/clerk-react';
 import { LogIn, UserPlus, Sparkles } from 'lucide-react';
 
@@ -36,12 +35,11 @@ export const AuthBar: React.FC<AuthBarProps> = ({ hasClerkKey }) => {
         </SignedOut>
 
         <SignedIn>
-          <div className="flex items-center gap-2.5 pl-1.5">
-            <UserInfoBadge />
+          <div className="flex items-center pl-1">
             <UserButton 
               appearance={{
                 elements: {
-                  userButtonAvatarBox: 'w-8 h-8 ring-2 ring-[#121417] transition-all',
+                  userButtonAvatarBox: 'w-8 h-8 ring-2 ring-[#121417] shadow-xs hover:scale-105 transition-all',
                 }
               }}
               afterSignOutUrl="/"
@@ -57,22 +55,6 @@ export const AuthBar: React.FC<AuthBarProps> = ({ hasClerkKey }) => {
     <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EBF755] border border-[#121417]/20 text-black text-[11px] font-bold">
       <Sparkles className="w-3 h-3" />
       <span>Guest Demo</span>
-    </div>
-  );
-};
-
-const UserInfoBadge: React.FC = () => {
-  const { user } = useUser();
-  if (!user) return null;
-
-  return (
-    <div className="hidden sm:flex flex-col text-right">
-      <span className="text-xs font-bold text-[#121417] truncate max-w-[120px]">
-        {user.fullName || user.firstName || user.username || 'Student'}
-      </span>
-      <span className="text-[10px] text-[#121417]/60 font-semibold truncate max-w-[120px]">
-        {user.primaryEmailAddress?.emailAddress}
-      </span>
     </div>
   );
 };
