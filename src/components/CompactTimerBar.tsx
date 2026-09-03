@@ -134,15 +134,6 @@ export const CompactTimerBar: React.FC = () => {
             >
               <PanelRightClose className="w-3.5 h-3.5" />
             </button>
-
-            {/* Mini Streak Pill */}
-            <div 
-              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[#F9F8F5] border border-[#121417]/15 text-[11px] font-extrabold text-[#121417]"
-              title={`${pomodoroStats.sessionsCompleted} sessions completed today`}
-            >
-              <Flame className="w-3.5 h-3.5 fill-current text-orange-500" />
-              <span>{pomodoroStats.streakDays}d</span>
-            </div>
           </div>
         </div>
 
