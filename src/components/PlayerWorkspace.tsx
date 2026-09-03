@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import { formatTime } from '../utils/youtube';
+import type { VideoItem } from '../types';
 import { 
   SkipBack, 
   SkipForward, 
@@ -35,6 +36,7 @@ export const PlayerWorkspace: React.FC = () => {
     saveNoteForCurrentVideo,
     getNoteForCurrentVideo,
     setIsAddModalOpen,
+    updateCourseVideos,
   } = useApp();
 
   const playerContainerRef = useRef<HTMLDivElement>(null);
@@ -49,6 +51,79 @@ export const PlayerWorkspace: React.FC = () => {
   const hasPrevious = currentIndex > 0;
   const hasNext = activeCourse ? currentIndex < activeCourse.videos.length - 1 : false;
 
+  // Sync real playlist videos from YouTube iFrame API
+  const syncPlaylistIfAvailable = useCallback((player: any) => {
+    if (!activeCourse?.playlistId || !player) return;
+    try {
+      const playlist: string[] = typeof player.getPlaylist === 'function' ? player.getPlaylist() : [];
+      const videoData = typeof player.getVideoData === 'function' ? player.getVideoData() : null;
+
+      if (playlist && playlist.length > 0) {
+        // Check if videos in activeCourse need to be synced with real YouTube video IDs
+        const hasDummyId = activeCourse.videos.some(v => v.youtubeId === 'dQw4w9WgXcQ' || !v.youtubeId);
+        const needsUpdate = hasDummyId || activeCourse.videos.length !== playlist.length;
+
+        if (needsUpdate) {
+          const updatedVideos: VideoItem[] = playlist.map((vId, idx) => {
+            const existing = activeCourse.videos[idx];
+            const isFirst = idx === 0;
+            const title = (isFirst && videoData?.title) 
+              ? `${String(idx + 1).padStart(2, '0')}. ${videoData.title}`
+              : existing?.title && !existing.title.includes('Loading') && !existing.title.includes('Orientation')
+              ? existing.title
+              : `Lecture ${String(idx + 1).padStart(2, '0')}`;
+
+            return {
+              id: existing?.id || `vid-${activeCourse.id}-${idx}`,
+              youtubeId: vId,
+              title,
+              duration: existing?.duration || '20:00',
+              completed: existing?.completed || false,
+            };
+          });
+
+          updateCourseVideos(activeCourse.id, updatedVideos);
+          if (!activeVideoId || activeCourse.videos.length <= 1) {
+            setActiveVideoId(updatedVideos[0].id);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Playlist sync notice:', e);
+    }
+  }, [activeCourse, activeVideoId, updateCourseVideos, setActiveVideoId]);
+
+  // Sync currently playing video's real title from player
+  const syncVideoMetadata = useCallback((player: any) => {
+    if (!activeCourse || !player) return;
+    try {
+      const vData = typeof player.getVideoData === 'function' ? player.getVideoData() : null;
+      if (!vData || !vData.title) return;
+
+      const pIndex = typeof player.getPlaylistIndex === 'function' ? player.getPlaylistIndex() : -1;
+      const targetIdx = pIndex >= 0 ? pIndex : activeCourse.videos.findIndex(v => v.id === activeVideoId);
+
+      if (targetIdx >= 0 && activeCourse.videos[targetIdx]) {
+        const vid = activeCourse.videos[targetIdx];
+        // If the title is generic "Lecture X" or still has dummy title, update with real title
+        const isGeneric = vid.title.startsWith('Lecture') || 
+                          vid.title.includes('Loading') || 
+                          vid.title.includes('Orientation') ||
+                          vid.title.includes('Capstone Project');
+
+        if (isGeneric) {
+          const updated = [...activeCourse.videos];
+          updated[targetIdx] = {
+            ...vid,
+            youtubeId: vData.video_id || vid.youtubeId,
+            title: `${String(targetIdx + 1).padStart(2, '0')}. ${vData.title}`,
+          };
+          updateCourseVideos(activeCourse.id, updated);
+        }
+      }
+    } catch {}
+  }, [activeCourse, activeVideoId, updateCourseVideos]);
+
   // Initialize YouTube IFrame API
   useEffect(() => {
     let checkInterval: number;
@@ -56,17 +131,13 @@ export const PlayerWorkspace: React.FC = () => {
     const initPlayer = () => {
       if (!window.YT || !window.YT.Player || !playerContainerRef.current) return;
 
-      // If player already exists, load video
+      // If player already exists, update video or playlist
       if (playerInstanceRef.current && typeof playerInstanceRef.current.loadVideoById === 'function') {
-        if (activeVideo?.youtubeId) {
-          playerInstanceRef.current.loadVideoById(activeVideo.youtubeId);
-        }
         return;
       }
 
-      // Create new player
-      playerInstanceRef.current = new window.YT.Player('youtube-player-element', {
-        videoId: activeVideo?.youtubeId || '',
+      const isPlaylistCourse = Boolean(activeCourse?.playlistId);
+      const playerConfig: any = {
         playerVars: {
           autoplay: 0,
           modestbranding: 1,
@@ -81,10 +152,13 @@ export const PlayerWorkspace: React.FC = () => {
             try {
               setVideoDurationSec(event.target.getDuration() || 0);
             } catch {}
+            // Sync playlist lectures on ready
+            syncPlaylistIfAvailable(event.target);
           },
           onStateChange: (event: any) => {
             if (event.data === 1) {
               setPlayerStatus('playing');
+              syncVideoMetadata(event.target);
             } else if (event.data === 2) {
               setPlayerStatus('paused');
             } else if (event.data === 0) {
@@ -96,7 +170,17 @@ export const PlayerWorkspace: React.FC = () => {
             }
           },
         },
-      });
+      };
+
+      if (isPlaylistCourse && activeCourse?.playlistId) {
+        playerConfig.playerVars.listType = 'playlist';
+        playerConfig.playerVars.list = activeCourse.playlistId;
+      } else if (activeVideo?.youtubeId) {
+        playerConfig.videoId = activeVideo.youtubeId;
+      }
+
+      // Create new player
+      playerInstanceRef.current = new window.YT.Player('youtube-player-element', playerConfig);
       setYtPlayer(playerInstanceRef.current);
     };
 
@@ -130,16 +214,35 @@ export const PlayerWorkspace: React.FC = () => {
     return () => {
       clearInterval(checkInterval);
     };
-  }, [activeVideo?.youtubeId, setYtPlayer, activeCourse?.id, activeVideo, toggleVideoCompletion]);
+  }, [
+    activeCourse?.id, 
+    activeCourse?.playlistId, 
+    activeVideo?.youtubeId, 
+    setYtPlayer, 
+    toggleVideoCompletion, 
+    syncPlaylistIfAvailable, 
+    syncVideoMetadata
+  ]);
 
   // Load new video when activeVideo changes
   useEffect(() => {
-    if (playerInstanceRef.current && typeof playerInstanceRef.current.loadVideoById === 'function') {
-      if (activeVideo?.youtubeId) {
-        playerInstanceRef.current.loadVideoById(activeVideo.youtubeId);
+    if (!playerInstanceRef.current) return;
+
+    if (activeCourse?.playlistId && typeof playerInstanceRef.current.playVideoAt === 'function') {
+      const idx = activeCourse.videos.findIndex(v => v.id === activeVideo?.id);
+      if (idx >= 0) {
+        const currentIdx = typeof playerInstanceRef.current.getPlaylistIndex === 'function' 
+          ? playerInstanceRef.current.getPlaylistIndex() 
+          : -1;
+
+        if (currentIdx !== idx) {
+          playerInstanceRef.current.playVideoAt(idx);
+        }
       }
+    } else if (activeVideo?.youtubeId && typeof playerInstanceRef.current.loadVideoById === 'function') {
+      playerInstanceRef.current.loadVideoById(activeVideo.youtubeId);
     }
-  }, [activeVideo?.youtubeId]);
+  }, [activeVideo?.id, activeVideo?.youtubeId, activeCourse?.playlistId, activeCourse?.videos]);
 
   const handlePrevious = () => {
     if (hasPrevious && activeCourse) {
@@ -359,7 +462,11 @@ export const PlayerWorkspace: React.FC = () => {
 
               {/* Watch on YouTube */}
               <a
-                href={`https://www.youtube.com/watch?v=${activeVideo.youtubeId}`}
+                href={
+                  activeCourse.playlistId 
+                    ? `https://www.youtube.com/playlist?list=${activeCourse.playlistId}`
+                    : `https://www.youtube.com/watch?v=${activeVideo.youtubeId}`
+                }
                 target="_blank"
                 rel="noopener noreferrer"
                 className="p-2 rounded-full bg-white hover:bg-slate-50 border border-[#121417]/30 text-[#121417] transition-colors"

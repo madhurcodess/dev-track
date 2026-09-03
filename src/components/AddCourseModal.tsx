@@ -61,23 +61,12 @@ export const AddCourseModal: React.FC = () => {
     const videos: VideoItem[] = [];
 
     if (parsed.type === 'playlist') {
-      // Create multi-lecture structure for playlist
-      const simulatedVideos = [
-        { title: '01. Orientation & Course Roadmap', duration: '14:20' },
-        { title: '02. Core Architecture & Environment Setup', duration: '28:45' },
-        { title: '03. Foundational Syntax & Hands-on Examples', duration: '36:10' },
-        { title: '04. Deep Dive: Memory, State & Performance', duration: '42:15' },
-        { title: '05. Capstone Project Walkthrough', duration: '55:00' },
-      ];
-
-      simulatedVideos.forEach((item, index) => {
-        videos.push({
-          id: `vid-${Date.now()}-${index}`,
-          youtubeId: parsed.videoId || 'dQw4w9WgXcQ',
-          title: item.title,
-          duration: item.duration,
-          completed: false,
-        });
+      videos.push({
+        id: `vid-${Date.now()}-0`,
+        youtubeId: parsed.videoId || '',
+        title: '01. Loading course playlist...',
+        duration: '--:--',
+        completed: false,
       });
     } else {
       // Single video

@@ -15,6 +15,7 @@ interface AppContextType {
   toggleVideoCompletion: (courseId: string, videoId: string) => void;
   markCourseCompleted: (courseId: string, completed: boolean) => void;
   addCourse: (course: Course) => void;
+  updateCourseVideos: (courseId: string, videos: VideoItem[], title?: string) => void;
   deleteCourse: (courseId: string) => void;
   resetAllData: () => void;
 
@@ -262,6 +263,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode; hasClerkKey?: bo
     }
   }, [setActiveCourseId, setActiveVideoId]);
 
+  // Update course videos dynamically (e.g. when synced from YouTube playlist API)
+  const updateCourseVideos = useCallback((courseId: string, updatedVideos: VideoItem[], updatedTitle?: string) => {
+    setCourses(prev => prev.map(c => {
+      if (c.id !== courseId) return c;
+      return {
+        ...c,
+        title: updatedTitle || c.title,
+        videos: updatedVideos,
+      };
+    }));
+  }, []);
+
   // Delete course
   const deleteCourse = useCallback((courseId: string) => {
     setCourses(prev => {
@@ -459,6 +472,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode; hasClerkKey?: bo
         toggleVideoCompletion,
         markCourseCompleted,
         addCourse,
+        updateCourseVideos,
         deleteCourse,
         resetAllData,
         getNoteForCurrentVideo,
