@@ -4,10 +4,11 @@ import { ClerkProvider } from '@clerk/clerk-react';
 import './index.css';
 import App from './App.tsx';
 
+const FALLBACK_CLERK_KEY = 'pk_test_Y29uY2lzZS1jYXQtNjkxOS5jbGVyay5hY2NvdW50cy5kZXYk';
 const envKey = (import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || import.meta.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) as string | undefined;
 const localKey = typeof window !== 'undefined' ? localStorage.getItem('devtrack_custom_clerk_key') : null;
-const rawKey = (envKey && !envKey.includes('your_clerk')) ? envKey : localKey;
-const clerkPubKey = (rawKey && rawKey.startsWith('pk_')) ? rawKey : '';
+const rawKey = (envKey && !envKey.includes('your_clerk') && envKey.trim().length > 0) ? envKey : (localKey || FALLBACK_CLERK_KEY);
+const clerkPubKey = (rawKey && rawKey.startsWith('pk_')) ? rawKey.trim() : FALLBACK_CLERK_KEY;
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
