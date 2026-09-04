@@ -95,10 +95,9 @@ export const PlayerWorkspace: React.FC = () => {
     if (hasAttemptedResumeRef.current === trackingKey) return;
 
     const savedSec = getPlaybackPosition(activeCourse.id, activeVideo.id);
-    const dur = typeof player.getDuration === 'function' ? player.getDuration() : 0;
 
-    // Edge case: if video is completed or near the end (>= 90%), clear and start from 0
-    if (activeVideo.completed || (dur > 0 && savedSec >= dur * 0.90)) {
+    // Edge case: if video is explicitly marked completed, clear and start from 0
+    if (activeVideo.completed) {
       clearPlaybackPosition(activeCourse.id, activeVideo.id);
       hasAttemptedResumeRef.current = trackingKey;
       return;
@@ -293,7 +292,7 @@ export const PlayerWorkspace: React.FC = () => {
       initPlayer();
     }
 
-    // Polling current playback time (1s tick) for accurate time display, 2-3s auto-save, and 90% auto-completion
+    // Polling current playback time (1s tick) for accurate time display and 2-3s auto-save
     checkInterval = window.setInterval(() => {
       if (playerInstanceRef.current && typeof playerInstanceRef.current.getCurrentTime === 'function') {
         try {
@@ -309,15 +308,8 @@ export const PlayerWorkspace: React.FC = () => {
           }
 
           if (activeCourse && activeVideo && dur > 0 && sec > 0) {
-            // 1. Completion Trigger: 90% or higher
-            const progressRatio = sec / dur;
-            if (progressRatio >= 0.90 && !activeVideo.completed) {
-              setVideoCompleted(activeCourse.id, activeVideo.id, true);
-              clearPlaybackPosition(activeCourse.id, activeVideo.id);
-              setCompletionToast('Lecture completed! (90% watched) 🎉');
-              setTimeout(() => setCompletionToast(null), 4500);
-            } else if (!activeVideo.completed && sec > 3) {
-              // 2. Periodically save every 2–3 seconds during active playback
+            // Periodically save every 2-3 seconds during active playback
+            if (!activeVideo.completed && sec > 3) {
               if (Math.abs(sec - lastSavedSecRef.current) >= 2) {
                 savePlaybackPosition(activeCourse.id, activeVideo.id, sec);
                 lastSavedSecRef.current = sec;
