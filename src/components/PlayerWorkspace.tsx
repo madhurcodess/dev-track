@@ -11,6 +11,8 @@ import {
   Maximize,
   Minimize,
   Clock, 
+  Play,
+  Pause, 
   ExternalLink, 
   BookmarkPlus, 
   Gauge, 
@@ -223,6 +225,7 @@ export const PlayerWorkspace: React.FC = () => {
           enablejsapi: 1,
           origin: window.location.origin,
           fs: 0,
+          controls: 0,
         },
         events: {
           onReady: (event: any) => {
@@ -496,70 +499,10 @@ export const PlayerWorkspace: React.FC = () => {
         </div>
 
         {/* Video Information & Action Controls */}
-        <div className="mt-5 p-5 rounded-3xl bg-white border-2 border-[#121417] shadow-solid">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            {/* Title & Metadata */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-2 flex-wrap">
-                <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-[#D4E4FC] text-[#121417] border border-[#121417]/15">
-                  Lecture {currentIndex + 1} of {activeCourse.videos.length}
-                </span>
-                <span className="flex items-center gap-1.5 text-[10px] uppercase font-mono px-2.5 py-0.5 rounded-full bg-[#F9F8F5] border border-[#121417]/15 text-[#121417]/70 font-bold">
-                  <span className={`w-1.5 h-1.5 rounded-full ${
-                    playerStatus === 'playing' ? 'bg-emerald-500 animate-ping' : playerStatus === 'paused' ? 'bg-amber-500' : 'bg-slate-400'
-                  }`} />
-                  {playerStatus}
-                </span>
-                {videoDurationSec > 0 && (
-                  <span className="flex items-center gap-1 text-[11px] text-[#121417]/70 font-mono font-bold">
-                    <Clock className="w-3 h-3" />
-                    <span>{formatTime(currentTimeSec)} / {formatTime(videoDurationSec)}</span>
-                  </span>
-                )}
-                {activeVideo.completed && (
-                  <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300">
-                    <Sparkles className="w-3 h-3" /> Completed
-                  </span>
-                )}
-              </div>
-
-              <h1 className="text-base sm:text-lg font-extrabold text-[#121417] tracking-tight leading-snug">
-                {activeVideo.title}
-              </h1>
-              <p className="text-xs text-[#121417]/60 mt-1 font-bold">
-                Course: <span className="text-[#121417]">{activeCourse.title}</span>
-              </p>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-              {/* Timestamp Note Quick Button */}
-              <button
-                onClick={handleQuickTimestampNote}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-[#D4E4FC] hover:bg-[#C2DBFB] text-[#121417] text-xs font-bold border-2 border-[#121417] shadow-sm transition-all hover:scale-105 active:scale-95"
-                title="Insert current video timestamp into notes"
-              >
-                <BookmarkPlus className="w-4 h-4" />
-                <span>Timestamp Note [{formatTime(currentTimeSec)}]</span>
-              </button>
-
-              {/* Mark Completed Toggle */}
-              <button
-                onClick={() => toggleVideoCompletion(activeCourse.id, activeVideo.id)}
-                className={`flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-bold border-2 border-[#121417] transition-all hover:scale-105 ${
-                  activeVideo.completed
-                    ? 'bg-[#EBF755] text-black shadow-solid'
-                    : 'bg-white text-[#121417] hover:bg-slate-50'
-                }`}
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>{activeVideo.completed ? 'Completed' : 'Mark as Done'}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Secondary Control Bar: Previous / Next / Speed / Theater / YouTube Link */}
-          <div className="mt-4 pt-3.5 border-t border-[#121417]/10 flex items-center justify-between gap-2 flex-wrap">
+        <div className="mt-5 p-5 rounded-3xl bg-white border-2 border-[#121417] shadow-solid flex flex-col gap-4">
+          
+          {/* Secondary Control Bar: Previous / Play / Pause / Next / Speed / Theater / YouTube Link */}
+          <div className="pb-3.5 border-b border-[#121417]/10 flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2">
               <button
                 onClick={handlePrevious}
@@ -572,6 +515,21 @@ export const PlayerWorkspace: React.FC = () => {
               >
                 <SkipBack className="w-3.5 h-3.5" />
                 <span>Prev</span>
+              </button>
+
+              {/* Play / Pause Button */}
+              <button
+                onClick={() => {
+                  if (playerStatus === 'playing') {
+                    playerInstanceRef.current?.pauseVideo();
+                  } else {
+                    playerInstanceRef.current?.playVideo();
+                  }
+                }}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold border transition-colors bg-white border-[#121417]/30 text-[#121417] hover:bg-slate-100"
+              >
+                {playerStatus === 'playing' ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                <span>{playerStatus === 'playing' ? 'Pause' : 'Play'}</span>
               </button>
 
               <button
@@ -650,6 +608,67 @@ export const PlayerWorkspace: React.FC = () => {
               >
                 <ExternalLink className="w-4 h-4" />
               </a>
+            </div>
+          </div>
+
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            {/* Title & Metadata */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-[#D4E4FC] text-[#121417] border border-[#121417]/15">
+                  Lecture {currentIndex + 1} of {activeCourse.videos.length}
+                </span>
+                <span className="flex items-center gap-1.5 text-[10px] uppercase font-mono px-2.5 py-0.5 rounded-full bg-[#F9F8F5] border border-[#121417]/15 text-[#121417]/70 font-bold">
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    playerStatus === 'playing' ? 'bg-emerald-500 animate-ping' : playerStatus === 'paused' ? 'bg-amber-500' : 'bg-slate-400'
+                  }`} />
+                  {playerStatus}
+                </span>
+                {videoDurationSec > 0 && (
+                  <span className="flex items-center gap-1 text-[11px] text-[#121417]/70 font-mono font-bold">
+                    <Clock className="w-3 h-3" />
+                    <span>{formatTime(currentTimeSec)} / {formatTime(videoDurationSec)}</span>
+                  </span>
+                )}
+                {activeVideo.completed && (
+                  <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300">
+                    <Sparkles className="w-3 h-3" /> Completed
+                  </span>
+                )}
+              </div>
+
+              <h1 className="text-base sm:text-lg font-extrabold text-[#121417] tracking-tight leading-snug">
+                {activeVideo.title}
+              </h1>
+              <p className="text-xs text-[#121417]/60 mt-1 font-bold">
+                Course: <span className="text-[#121417]">{activeCourse.title}</span>
+              </p>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+              {/* Timestamp Note Quick Button */}
+              <button
+                onClick={handleQuickTimestampNote}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-[#D4E4FC] hover:bg-[#C2DBFB] text-[#121417] text-xs font-bold border-2 border-[#121417] shadow-sm transition-all hover:scale-105 active:scale-95"
+                title="Insert current video timestamp into notes"
+              >
+                <BookmarkPlus className="w-4 h-4" />
+                <span>Timestamp Note [{formatTime(currentTimeSec)}]</span>
+              </button>
+
+              {/* Mark Completed Toggle */}
+              <button
+                onClick={() => toggleVideoCompletion(activeCourse.id, activeVideo.id)}
+                className={`flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-bold border-2 border-[#121417] transition-all hover:scale-105 ${
+                  activeVideo.completed
+                    ? 'bg-[#EBF755] text-black shadow-solid'
+                    : 'bg-white text-[#121417] hover:bg-slate-50'
+                }`}
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>{activeVideo.completed ? 'Completed' : 'Mark as Done'}</span>
+              </button>
             </div>
           </div>
         </div>
