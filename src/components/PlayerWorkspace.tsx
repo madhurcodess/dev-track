@@ -209,10 +209,14 @@ export const PlayerWorkspace: React.FC = () => {
             setPlayerStatus('ready');
             try {
               setVideoDurationSec(event.target.getDuration() || 0);
-              const iframe = event.target.getIframe?.() || document.querySelector('#youtube-player-element');
+            } catch {}
+            // Set allowfullscreen on the generated iframe so YouTube's built-in fullscreen works
+            try {
+              const iframe = event.target.getIframe();
               if (iframe) {
-                iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen');
-                iframe.setAttribute('allowfullscreen', 'true');
+                iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen';
+                iframe.allowFullscreen = true;
+                iframe.setAttribute('allowfullscreen', '');
               }
             } catch {}
             syncPlaylistIfAvailable(event.target);
@@ -476,9 +480,9 @@ export const PlayerWorkspace: React.FC = () => {
           </div>
         )}
 
-        {/* 16:9 Responsive Video Aspect Ratio */}
-        <div className="relative w-full rounded-3xl overflow-hidden shadow-solid-lg border-2 border-[#121417] bg-black aspect-video group">
-          <div id="youtube-player-element" ref={playerContainerRef} className="w-full h-full" />
+        {/* 16:9 Responsive Video Aspect Ratio - overflow must NOT be hidden so YouTube built-in fullscreen works */}
+        <div className="relative w-full rounded-3xl shadow-solid-lg border-2 border-[#121417] bg-black aspect-video" style={{ overflow: 'visible' }}>
+          <div id="youtube-player-element" ref={playerContainerRef} className="w-full h-full rounded-3xl overflow-hidden" />
         </div>
 
         {/* Video Information & Action Controls */}
