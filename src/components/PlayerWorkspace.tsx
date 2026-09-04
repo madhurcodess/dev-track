@@ -288,7 +288,7 @@ export const PlayerWorkspace: React.FC = () => {
                 setVideoCompleted(activeCourse.id, activeVideo.id, true);
                 clearPlaybackPosition(activeCourse.id, activeVideo.id);
                 setCompletionToast('Lecture completed! 🎉');
-                setTimeout(() => setCompletionToast(null), 4500);
+                setTimeout(() => setCompletionToast(null), 12000); // 12 seconds to allow clicking next
               }
             }
           },
@@ -487,13 +487,26 @@ export const PlayerWorkspace: React.FC = () => {
               <Sparkles className="w-4 h-4 fill-current text-black" />
               <span>{completionToast}</span>
             </div>
-            <button
-              onClick={() => setCompletionToast(null)}
-              className="text-black/60 hover:text-black p-1 text-xs font-black"
-              title="Close"
-            >
-              ✕
-            </button>
+            <div className="flex items-center gap-2">
+              {hasNext && (
+                <button
+                  onClick={() => {
+                    handleNext();
+                    setCompletionToast(null);
+                  }}
+                  className="px-3 py-1 rounded-full text-[11px] font-black bg-[#121417] text-white hover:bg-black transition-all shadow-xs active:scale-95"
+                >
+                  Start Next Lecture <SkipForward className="w-3 h-3 inline ml-0.5" />
+                </button>
+              )}
+              <button
+                onClick={() => setCompletionToast(null)}
+                className="text-black/60 hover:text-black p-1 text-xs font-black ml-1"
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
           </div>
         )}
 
