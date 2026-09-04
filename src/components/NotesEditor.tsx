@@ -209,7 +209,8 @@ export const NotesEditor: React.FC = () => {
     isInternalChangeRef.current = true;
     editorRef.current.innerHTML = markdownToWysiwygHtml(rawNote);
     isInternalChangeRef.current = false;
-  }, [activeVideo?.id, activeCourse?.id, getNoteForCurrentVideo]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeVideo?.id, activeCourse?.id]);
 
   // Handle content modification in contentEditable
   const handleInput = useCallback(() => {
