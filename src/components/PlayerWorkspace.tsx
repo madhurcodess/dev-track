@@ -12,7 +12,7 @@ import {
   Minimize,
   Clock, 
   Play,
-  Pause, 
+  Pause,
   ExternalLink, 
   BookmarkPlus, 
   Gauge, 
@@ -134,6 +134,17 @@ export const PlayerWorkspace: React.FC = () => {
     setResumeBanner(null);
   }, [activeCourse, activeVideo, clearPlaybackPosition]);
 
+  // Toggle Play / Pause
+  const togglePlayPause = () => {
+    if (playerInstanceRef.current) {
+      if (playerStatus === 'playing') {
+        playerInstanceRef.current.pauseVideo();
+      } else {
+        playerInstanceRef.current.playVideo();
+      }
+    }
+  };
+
   // Sync real playlist videos from YouTube iFrame API
   const syncPlaylistIfAvailable = useCallback((player: any) => {
     if (!activeCourse?.playlistId || !player) return;
@@ -215,8 +226,6 @@ export const PlayerWorkspace: React.FC = () => {
       if (playerInstanceRef.current && typeof playerInstanceRef.current.loadVideoById === 'function') {
         return;
       }
-
-      const isPlaylistCourse = Boolean(activeCourse?.playlistId);
       const playerConfig: any = {
         playerVars: {
           autoplay: 0,
@@ -225,7 +234,6 @@ export const PlayerWorkspace: React.FC = () => {
           enablejsapi: 1,
           origin: window.location.origin,
           fs: 0,
-          controls: 0,
         },
         events: {
           onReady: (event: any) => {
@@ -271,7 +279,10 @@ export const PlayerWorkspace: React.FC = () => {
         },
       };
 
-      if (isPlaylistCourse && activeCourse?.playlistId) {
+      const hasDummyId = activeCourse?.videos?.some(v => v.youtubeId === 'dQw4w9WgXcQ' || !v.youtubeId);
+      const needsPlaylistSync = activeCourse?.playlistId && (hasDummyId || activeCourse.videos.length <= 1);
+
+      if (needsPlaylistSync) {
         playerConfig.playerVars.listType = 'playlist';
         playerConfig.playerVars.list = activeCourse.playlistId;
       } else if (activeVideo?.youtubeId) {
@@ -347,19 +358,20 @@ export const PlayerWorkspace: React.FC = () => {
     lastSavedSecRef.current = 0;
     setResumeBanner(null);
 
-    if (activeCourse?.playlistId && typeof playerInstanceRef.current.playVideoAt === 'function') {
-      const idx = activeCourse.videos.findIndex(v => v.id === activeVideo?.id);
-      if (idx >= 0) {
-        const currentIdx = typeof playerInstanceRef.current.getPlaylistIndex === 'function' 
-          ? playerInstanceRef.current.getPlaylistIndex() 
-          : -1;
-
-        if (currentIdx !== idx) {
-          playerInstanceRef.current.playVideoAt(idx);
+    // If the player is already ready and has methods
+    if (typeof playerInstanceRef.current.loadVideoById === 'function') {
+      const currentPlaylistIndex = playerInstanceRef.current.getPlaylistIndex?.();
+      const targetIdx = activeCourse?.videos.findIndex(v => v.id === activeVideoId) ?? -1;
+      
+      // If the player is currently running a playlist and we need to jump within it
+      if (currentPlaylistIndex !== undefined && currentPlaylistIndex !== -1 && targetIdx !== -1) {
+        if (currentPlaylistIndex !== targetIdx) {
+          playerInstanceRef.current.playVideoAt?.(targetIdx);
         }
+      } else if (activeVideo?.youtubeId) {
+        // Normal single video navigation (prevents YouTube's built-in playlist overlay)
+        playerInstanceRef.current.loadVideoById?.(activeVideo.youtubeId);
       }
-    } else if (activeVideo?.youtubeId && typeof playerInstanceRef.current.loadVideoById === 'function') {
-      playerInstanceRef.current.loadVideoById(activeVideo.youtubeId);
     }
   }, [activeVideo?.id, activeVideo?.youtubeId, activeCourse?.playlistId, activeCourse?.videos]);
 
@@ -499,10 +511,9 @@ export const PlayerWorkspace: React.FC = () => {
         </div>
 
         {/* Video Information & Action Controls */}
-        <div className="mt-5 p-5 rounded-3xl bg-white border-2 border-[#121417] shadow-solid flex flex-col gap-4">
-          
-          {/* Secondary Control Bar: Previous / Play / Pause / Next / Speed / Theater / YouTube Link */}
-          <div className="pb-3.5 border-b border-[#121417]/10 flex items-center justify-between gap-2 flex-wrap">
+        <div className="mt-5 p-5 rounded-3xl bg-white border-2 border-[#121417] shadow-solid">
+          {/* Primary Control Bar: Previous / Play / Next / Speed / Theater / Fullscreen / YouTube Link */}
+          <div className="mb-4 pb-3.5 border-b border-[#121417]/10 flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2">
               <button
                 onClick={handlePrevious}
@@ -517,19 +528,12 @@ export const PlayerWorkspace: React.FC = () => {
                 <span>Prev</span>
               </button>
 
-              {/* Play / Pause Button */}
               <button
-                onClick={() => {
-                  if (playerStatus === 'playing') {
-                    playerInstanceRef.current?.pauseVideo();
-                  } else {
-                    playerInstanceRef.current?.playVideo();
-                  }
-                }}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold border transition-colors bg-white border-[#121417]/30 text-[#121417] hover:bg-slate-100"
+                onClick={togglePlayPause}
+                className="flex items-center justify-center w-8 h-8 rounded-full bg-[#121417] text-white hover:bg-[#121417]/80 transition-colors shadow-sm"
+                title={playerStatus === 'playing' ? "Pause" : "Play"}
               >
-                {playerStatus === 'playing' ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-                <span>{playerStatus === 'playing' ? 'Pause' : 'Play'}</span>
+                {playerStatus === 'playing' ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
               </button>
 
               <button
