@@ -8,8 +8,6 @@ import {
   CheckCircle2, 
   Maximize2, 
   Minimize2, 
-  Maximize,
-  Minimize,
   Clock, 
   ExternalLink, 
   BookmarkPlus, 
@@ -64,24 +62,6 @@ export const PlayerWorkspace: React.FC = () => {
   const lastSavedSecRef = useRef<number>(0);
 
   const videoWrapperRef = useRef<HTMLDivElement>(null);
-  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
-
-  const toggleFullscreen = () => {
-    if (!videoWrapperRef.current) return;
-    if (!document.fullscreenElement) {
-      videoWrapperRef.current.requestFullscreen().catch(() => {});
-    } else {
-      document.exitFullscreen().catch(() => {});
-    }
-  };
-
-  useEffect(() => {
-    const handleFsChange = () => {
-      setIsFullscreen(Boolean(document.fullscreenElement));
-    };
-    document.addEventListener('fullscreenchange', handleFsChange);
-    return () => document.removeEventListener('fullscreenchange', handleFsChange);
-  }, []);
 
   const currentIndex = activeCourse ? activeCourse.videos.findIndex(v => v.id === activeVideoId) : -1;
   const hasPrevious = currentIndex > 0;
@@ -277,6 +257,16 @@ export const PlayerWorkspace: React.FC = () => {
 
       playerInstanceRef.current = new window.YT.Player('youtube-player-element', playerConfig);
       setYtPlayer(playerInstanceRef.current);
+
+      try {
+        const iframe = document.querySelector('#youtube-player-element') as HTMLIFrameElement | null;
+        if (iframe) {
+          iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen');
+          iframe.setAttribute('allowfullscreen', 'true');
+          iframe.setAttribute('webkitallowfullscreen', 'true');
+          iframe.setAttribute('mozallowfullscreen', 'true');
+        }
+      } catch {}
     };
 
     if (!window.YT) {
@@ -630,15 +620,6 @@ export const PlayerWorkspace: React.FC = () => {
                   title={isTheaterMode ? "Exit Theater Mode" : "Enter Theater Mode"}
                 >
                   {isTheaterMode ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                </button>
-
-                {/* Fullscreen Video Toggle */}
-                <button
-                  onClick={toggleFullscreen}
-                  className="p-1.5 rounded-full bg-white hover:bg-slate-50 border border-[#121417]/30 text-[#121417] transition-colors"
-                  title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen Video"}
-                >
-                  {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
                 </button>
 
                 {/* Watch on YouTube */}
