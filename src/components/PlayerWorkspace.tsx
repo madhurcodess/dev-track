@@ -535,7 +535,7 @@ export const PlayerWorkspace: React.FC = () => {
         )}
 
         {/* 16:9 Responsive Video Aspect Ratio */}
-        <div ref={videoWrapperRef} className="relative w-full rounded-3xl overflow-hidden shadow-solid-lg border-2 border-[#121417] bg-black aspect-video group">
+        <div ref={videoWrapperRef} className="relative w-full rounded-3xl overflow-hidden aspect-video group">
           <div id="youtube-player-element" ref={playerContainerRef} className="w-full h-full" />
         </div>
 
