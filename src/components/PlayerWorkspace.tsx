@@ -47,7 +47,7 @@ export const PlayerWorkspace: React.FC = () => {
     setCurrentView,
   } = useApp();
 
-  const playerContainerRef = useRef<HTMLDivElement>(null);
+  const playerContainerRef = useRef<HTMLIFrameElement>(null);
   const playerInstanceRef = useRef<any>(null);
   const [playbackRate, setPlaybackRate] = useState<number>(1);
   const [isRateMenuOpen, setIsRateMenuOpen] = useState<boolean>(false);
@@ -209,14 +209,10 @@ export const PlayerWorkspace: React.FC = () => {
             setPlayerStatus('ready');
             try {
               setVideoDurationSec(event.target.getDuration() || 0);
-            } catch {}
-            // Set allowfullscreen on the generated iframe so YouTube's built-in fullscreen works
-            try {
-              const iframe = event.target.getIframe();
+              const iframe = event.target.getIframe?.() || document.querySelector('#youtube-player-element');
               if (iframe) {
-                iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen';
-                iframe.allowFullscreen = true;
-                iframe.setAttribute('allowfullscreen', '');
+                iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen');
+                iframe.setAttribute('allowfullscreen', 'true');
               }
             } catch {}
             syncPlaylistIfAvailable(event.target);
@@ -480,9 +476,16 @@ export const PlayerWorkspace: React.FC = () => {
           </div>
         )}
 
-        {/* 16:9 Responsive Video Aspect Ratio - overflow must NOT be hidden so YouTube built-in fullscreen works */}
-        <div className="relative w-full rounded-3xl shadow-solid-lg border-2 border-[#121417] bg-black aspect-video" style={{ overflow: 'visible' }}>
-          <div id="youtube-player-element" ref={playerContainerRef} className="w-full h-full rounded-3xl overflow-hidden" />
+        {/* 16:9 Responsive Video Aspect Ratio */}
+        <div className="relative w-full rounded-3xl overflow-hidden shadow-solid-lg border-2 border-[#121417] bg-black aspect-video group">
+          <iframe 
+            id="youtube-player-element" 
+            ref={playerContainerRef} 
+            className="w-full h-full" 
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+            allowFullScreen
+            frameBorder="0"
+          />
         </div>
 
         {/* Video Information & Action Controls */}
