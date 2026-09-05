@@ -35,6 +35,9 @@ export interface PomodoroStats {
 export interface VideoNote {
   videoId: string;
   courseId: string;
+  title: string;
   content: string;
+  color: string;
+  isPinned: boolean;
   updatedAt: number;
 }

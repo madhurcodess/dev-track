@@ -22,6 +22,7 @@ import {
   LayoutGrid
 } from 'lucide-react';
 import { AdBanner } from './AdBanner';
+import { resolvePlaylistTitles, isGenericLectureTitle } from '../utils/youtubeTitles';
 
 declare global {
   interface Window {
@@ -83,13 +84,38 @@ export const PlayerWorkspace: React.FC = () => {
     };
     
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if user is typing in an input
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      const target = e.target as HTMLElement | null;
+      // Ignore if user is typing in an input, textarea, contenteditable, or rich text editor (Tiptap / ProseMirror)
+      if (
+        !target ||
+        target instanceof HTMLInputElement || 
+        target instanceof HTMLTextAreaElement ||
+        target.isContentEditable ||
+        Boolean(target.closest?.('[contenteditable="true"]')) ||
+        Boolean(target.closest?.('.ProseMirror')) ||
+        Boolean(target.closest?.('.tiptap'))
+      ) {
         return;
       }
+
+      // Do not trigger if Ctrl/Cmd/Alt is pressed (e.g. browser Ctrl+F search)
+      if (e.ctrlKey || e.metaKey || e.altKey) {
+        return;
+      }
+
       if (e.key.toLowerCase() === 'f') {
-        e.preventDefault();
-        toggleFullscreen();
+        // If already in fullscreen, allow pressing F to exit fullscreen
+        if (isFullscreen) {
+          e.preventDefault();
+          toggleFullscreen();
+          return;
+        }
+
+        // Only enter fullscreen via F shortcut when the video is actively playing
+        if (playerStatus === 'playing') {
+          e.preventDefault();
+          toggleFullscreen();
+        }
       }
     };
 
@@ -99,7 +125,7 @@ export const PlayerWorkspace: React.FC = () => {
       document.removeEventListener('fullscreenchange', handleFsChange);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [toggleFullscreen]);
+  }, [toggleFullscreen, isFullscreen, playerStatus]);
 
 
   const currentIndex = activeCourse ? activeCourse.videos.findIndex(v => v.id === activeVideoId) : -1;
@@ -124,7 +150,15 @@ export const PlayerWorkspace: React.FC = () => {
     // Only resume if saved position > 5 seconds
     if (savedSec > 5) {
       try {
-        player.seekTo(savedSec, true);
+        if (typeof player.cueVideoById === 'function') {
+          player.cueVideoById({
+            videoId: activeVideo.youtubeId,
+            startSeconds: savedSec,
+          });
+        } else {
+          player.seekTo(savedSec, false);
+          player.pauseVideo?.();
+        }
         hasAttemptedResumeRef.current = trackingKey;
         setResumeBanner({ seconds: savedSec, formatted: formatTime(savedSec) });
         setTimeout(() => {
@@ -178,7 +212,7 @@ export const PlayerWorkspace: React.FC = () => {
             const isFirst = idx === 0;
             const title = (isFirst && videoData?.title) 
               ? `${String(idx + 1).padStart(2, '0')}. ${videoData.title}`
-              : existing?.title && !existing.title.includes('Loading') && !existing.title.includes('Orientation')
+              : existing?.title && !isGenericLectureTitle(existing.title)
               ? existing.title
               : `Lecture ${String(idx + 1).padStart(2, '0')}`;
 
@@ -189,6 +223,11 @@ export const PlayerWorkspace: React.FC = () => {
               duration: existing?.duration || '20:00',
               completed: existing?.completed || false,
             };
+          });
+
+          // Instantly resolve real YouTube titles for all videos in this playlist
+          resolvePlaylistTitles(updatedVideos, (resolved) => {
+            updateCourseVideos(activeCourse.id, resolved);
           });
 
           updateCourseVideos(activeCourse.id, updatedVideos);
@@ -214,17 +253,16 @@ export const PlayerWorkspace: React.FC = () => {
 
       if (targetIdx >= 0 && activeCourse.videos[targetIdx]) {
         const vid = activeCourse.videos[targetIdx];
-        const isGeneric = vid.title.startsWith('Lecture') || 
-                          vid.title.includes('Loading') || 
-                          vid.title.includes('Orientation') ||
-                          vid.title.includes('Capstone Project');
+        const isGeneric = isGenericLectureTitle(vid.title);
 
-        if (isGeneric) {
+        if (isGeneric || !vid.title.includes(vData.title)) {
           const updated = [...activeCourse.videos];
+          const prefix = `${String(targetIdx + 1).padStart(2, '0')}. `;
+          const formatted = vData.title.startsWith(prefix) ? vData.title : `${prefix}${vData.title}`;
           updated[targetIdx] = {
             ...vid,
             youtubeId: vData.video_id || vid.youtubeId,
-            title: `${String(targetIdx + 1).padStart(2, '0')}. ${vData.title}`,
+            title: formatted,
           };
           updateCourseVideos(activeCourse.id, updated);
         }
@@ -256,6 +294,7 @@ export const PlayerWorkspace: React.FC = () => {
             setYtPlayer(event.target);
             setPlayerStatus('ready');
             try {
+              event.target.pauseVideo?.();
               setVideoDurationSec(event.target.getDuration() || 0);
               const iframe = event.target.getIframe?.() || document.querySelector('#youtube-player-element');
               if (iframe) {
@@ -382,14 +421,23 @@ export const PlayerWorkspace: React.FC = () => {
       // If the player is currently running a playlist and we need to jump within it
       if (currentPlaylistIndex !== undefined && currentPlaylistIndex !== -1 && targetIdx !== -1) {
         if (currentPlaylistIndex !== targetIdx) {
-          playerInstanceRef.current.playVideoAt?.(targetIdx);
+          playerInstanceRef.current.cueVideoAt?.(targetIdx);
         }
       } else if (activeVideo?.youtubeId) {
-        // Normal single video navigation (prevents YouTube's built-in playlist overlay)
-        playerInstanceRef.current.loadVideoById?.(activeVideo.youtubeId);
+        // Use cueVideoById to prevent auto-starting video without user action
+        const savedSec = getPlaybackPosition(activeCourse?.id || '', activeVideo.id);
+        if (savedSec > 5 && !activeVideo.completed) {
+          playerInstanceRef.current.cueVideoById?.({
+            videoId: activeVideo.youtubeId,
+            startSeconds: savedSec,
+          });
+          setResumeBanner({ seconds: savedSec, formatted: formatTime(savedSec) });
+        } else {
+          playerInstanceRef.current.cueVideoById?.(activeVideo.youtubeId);
+        }
       }
     }
-  }, [activeVideo?.id, activeVideo?.youtubeId, activeCourse?.playlistId, activeCourse?.videos]);
+  }, [activeVideo?.id, activeVideo?.youtubeId, activeCourse?.playlistId, activeCourse?.videos, activeCourse?.id, getPlaybackPosition]);
 
   const handlePrevious = () => {
     if (hasPrevious && activeCourse) {
@@ -419,8 +467,8 @@ export const PlayerWorkspace: React.FC = () => {
     }
     const formatted = formatTime(currentSec);
     const existing = getNoteForCurrentVideo();
-    const tag = `\n\n- [${formatted}] `;
-    saveNoteForCurrentVideo(existing + tag);
+    const tag = `<p><br></p><p>▶ [${formatted}] </p>`;
+    saveNoteForCurrentVideo({ content: existing.content + tag });
   }, [getNoteForCurrentVideo, saveNoteForCurrentVideo]);
 
   if (!activeCourse || !activeVideo) {
@@ -464,9 +512,9 @@ export const PlayerWorkspace: React.FC = () => {
   return (
     <main className="flex-1 flex flex-col min-w-0 bg-[#F9F8F5] overflow-y-auto">
       {/* Player Container */}
-      <div className="p-4 sm:p-6 lg:p-8 pb-2 max-w-6xl w-full mx-auto">
+      <div className="p-3 sm:p-4 xl:p-6 2xl:p-8 pb-2 max-w-6xl w-full mx-auto">
         {/* Navigation Breadcrumb */}
-        <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="flex items-center justify-between gap-2 mb-2.5">
           <button
             onClick={() => setCurrentView('playlists')}
             className="flex items-center gap-1.5 text-xs font-bold text-[#121417]/70 hover:text-[#121417] transition-colors"
@@ -474,7 +522,7 @@ export const PlayerWorkspace: React.FC = () => {
             <LayoutGrid className="w-3.5 h-3.5" />
             <span>All Playlists</span>
             <span className="text-[#121417]/40">/</span>
-            <span className="text-[#121417] font-extrabold truncate max-w-[200px] sm:max-w-[300px]">
+            <span className="text-[#121417] font-extrabold truncate max-w-[180px] sm:max-w-[280px] xl:max-w-[400px]">
               {activeCourse.title}
             </span>
           </button>
@@ -535,12 +583,12 @@ export const PlayerWorkspace: React.FC = () => {
         )}
 
         {/* 16:9 Responsive Video Aspect Ratio */}
-        <div ref={videoWrapperRef} className="relative w-full rounded-3xl overflow-hidden aspect-video group">
+        <div ref={videoWrapperRef} className="relative w-full rounded-2xl 2xl:rounded-3xl overflow-hidden aspect-video group shadow-sm">
           <div id="youtube-player-element" ref={playerContainerRef} className="w-full h-full" />
         </div>
 
         {/* Video Information & Action Controls */}
-        <div className="mt-5 p-5 rounded-3xl bg-white border-2 border-[#121417] shadow-solid">
+        <div className="mt-3 xl:mt-5 p-3.5 sm:p-4 2xl:p-5 rounded-2xl 2xl:rounded-3xl bg-white border-2 border-[#121417] shadow-solid">
           {/* Primary Control Bar: Previous / Play / Next / Speed / Theater / Fullscreen / YouTube Link */}
           <div className="mb-4 pb-3.5 border-b border-[#121417]/10 flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2">
@@ -670,7 +718,7 @@ export const PlayerWorkspace: React.FC = () => {
                 )}
               </div>
 
-              <h1 className="text-base sm:text-lg font-extrabold text-[#121417] tracking-tight leading-snug">
+              <h1 className="text-sm sm:text-base 2xl:text-lg font-extrabold text-[#121417] tracking-tight leading-snug line-clamp-2">
                 {activeVideo.title}
               </h1>
               <p className="text-xs text-[#121417]/60 mt-1 font-bold">
@@ -679,27 +727,27 @@ export const PlayerWorkspace: React.FC = () => {
             </div>
 
             {/* Quick Actions */}
-            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap flex-shrink-0">
               {/* Timestamp Note Quick Button */}
               <button
                 onClick={handleQuickTimestampNote}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-[#D4E4FC] hover:bg-[#C2DBFB] text-[#121417] text-xs font-bold border-2 border-[#121417] shadow-sm transition-all hover:scale-105 active:scale-95"
+                className="flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full bg-[#D4E4FC] hover:bg-[#C2DBFB] text-[#121417] text-xs font-bold border-2 border-[#121417] shadow-sm transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
                 title="Insert current video timestamp into notes"
               >
-                <BookmarkPlus className="w-4 h-4" />
+                <BookmarkPlus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span>Timestamp Note [{formatTime(currentTimeSec)}]</span>
               </button>
 
               {/* Mark Completed Toggle */}
               <button
                 onClick={() => toggleVideoCompletion(activeCourse.id, activeVideo.id)}
-                className={`flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-bold border-2 border-[#121417] transition-all hover:scale-105 ${
+                className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full text-xs font-bold border-2 border-[#121417] transition-all hover:scale-105 whitespace-nowrap ${
                   activeVideo.completed
                     ? 'bg-[#EBF755] text-black shadow-solid'
                     : 'bg-white text-[#121417] hover:bg-slate-50'
                 }`}
               >
-                <CheckCircle2 className="w-4 h-4" />
+                <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span>{activeVideo.completed ? 'Completed' : 'Mark as Done'}</span>
               </button>
             </div>

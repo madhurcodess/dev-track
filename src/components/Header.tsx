@@ -2,9 +2,11 @@ import React from 'react';
 import { useApp } from '../context/AppContext';
 import { 
   Plus, 
-  Sparkles,
   Flame,
-  Coffee
+  Coffee,
+  LayoutGrid,
+  Tv,
+  FileText
 } from 'lucide-react';
 import { AuthBar } from './AuthBar';
 import { BrandLogo } from './BrandLogo';
@@ -19,15 +21,10 @@ export const Header: React.FC = () => {
     setCurrentView,
   } = useApp();
 
-  const totalVideos = activeCourse?.videos.length || 0;
-  const completedVideos = activeCourse?.videos.filter(v => v.completed).length || 0;
-  const progressPercent = totalVideos > 0 ? Math.round((completedVideos / totalVideos) * 100) : 0;
-
   return (
     <header className="sticky top-0 z-30 h-16 w-full border-b border-[#121417]/10 bg-[#F9F8F5]/95 backdrop-blur-md px-3 sm:px-5 lg:px-6 flex items-center justify-between gap-3">
       {/* Left: Brand Logo */}
-      <div className="flex items-center gap-2 sm:gap-3 min-w-fit">
-        {/* Custom Brand Logo - Click to go to Playlists */}
+      <div className="flex items-center min-w-fit">
         <button 
           onClick={() => setCurrentView('playlists')}
           className="flex items-center text-left transition-transform hover:scale-102"
@@ -37,32 +34,48 @@ export const Header: React.FC = () => {
         </button>
       </div>
 
-      {/* Center: Global Progress Bar (shown when active in workspace) */}
-      {currentView === 'workspace' && activeCourse && (
-        <div className="hidden md:flex flex-1 max-w-md flex-col gap-1 px-4">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-[#121417]/70 font-bold flex items-center gap-1.5">
-              <span className="truncate max-w-[180px]">{activeCourse.title}</span>
-              {progressPercent === 100 && (
-                <span className="text-emerald-700 inline-flex items-center gap-0.5 text-[10px] font-bold bg-emerald-100 px-1.5 py-0.2 rounded-full border border-emerald-300">
-                  <Sparkles className="w-3 h-3" /> Done!
-                </span>
-              )}
-            </span>
-            <span className="font-bold text-[#121417]">
-              <span>{completedVideos}</span>
-              <span className="text-[#121417]/50">/{totalVideos}</span>
-              <span className="ml-1.5 text-[#121417]/70">({progressPercent}%)</span>
-            </span>
-          </div>
-          <div className="h-2.5 w-full bg-black/5 rounded-full overflow-hidden p-0.5 border border-[#121417]/10">
-            <div
-              className="h-full rounded-full transition-all duration-500 bg-[#EBF755] border border-[#121417]/20 shadow-sm"
-              style={{ width: `${Math.max(progressPercent, totalVideos > 0 ? 3 : 0)}%` }}
-            />
-          </div>
-        </div>
-      )}
+      {/* Center: View Switcher Hub (Playlists | Workspace | Notes) */}
+      <nav className="flex items-center gap-1 bg-white p-1 rounded-2xl border border-[#121417]/15 shadow-2xs">
+        <button
+          onClick={() => setCurrentView('playlists')}
+          className={`flex items-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-black transition-all ${
+            currentView === 'playlists'
+              ? 'bg-[#121417] text-[#EBF755] shadow-xs'
+              : 'text-[#121417]/70 hover:text-[#121417] hover:bg-black/5'
+          }`}
+        >
+          <LayoutGrid className="w-3.5 h-3.5" />
+          <span>Playlists</span>
+        </button>
+
+        <button
+          onClick={() => setCurrentView('workspace')}
+          disabled={!activeCourse}
+          className={`flex items-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-black transition-all ${
+            currentView === 'workspace'
+              ? 'bg-[#121417] text-[#EBF755] shadow-xs'
+              : activeCourse
+              ? 'text-[#121417]/70 hover:text-[#121417] hover:bg-black/5'
+              : 'opacity-40 cursor-not-allowed text-[#121417]/40'
+          }`}
+          title={!activeCourse ? 'Select a playlist to start learning' : 'Open Learning Workspace'}
+        >
+          <Tv className="w-3.5 h-3.5" />
+          <span>Workspace</span>
+        </button>
+
+        <button
+          onClick={() => setCurrentView('notes')}
+          className={`flex items-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-black transition-all ${
+            currentView === 'notes'
+              ? 'bg-[#121417] text-[#EBF755] shadow-xs'
+              : 'text-[#121417]/70 hover:text-[#121417] hover:bg-black/5'
+          }`}
+        >
+          <FileText className="w-3.5 h-3.5" />
+          <span>Notes</span>
+        </button>
+      </nav>
 
       {/* Right: Streak, Add Course, and Auth Profile */}
       <div className="flex items-center gap-2 sm:gap-3">

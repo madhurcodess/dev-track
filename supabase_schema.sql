@@ -27,7 +27,10 @@ CREATE TABLE IF NOT EXISTS public.user_notes (
     user_id TEXT NOT NULL,
     course_id TEXT NOT NULL,
     video_id TEXT NOT NULL,
+    title TEXT DEFAULT '',
     content TEXT DEFAULT '',
+    color TEXT DEFAULT '#ffffff',
+    is_pinned BOOLEAN DEFAULT false,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );

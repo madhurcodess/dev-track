@@ -14,9 +14,9 @@ import {
   Clock,
   PanelLeftClose,
   LayoutGrid,
-  Tv
+  Tv,
+  FileText
 } from 'lucide-react';
-import { AdBanner } from './AdBanner';
 
 export const Sidebar: React.FC = () => {
   const {
@@ -46,23 +46,23 @@ export const Sidebar: React.FC = () => {
       <aside className="w-80 sm:w-88 flex-shrink-0 h-[calc(100vh-4rem)] flex flex-col border-r border-[#121417]/10 bg-white">
         {/* View Switcher: All Playlists vs Learning Workspace (Directly Below Logo) */}
         <div className="p-3 border-b border-[#121417]/10 bg-[#F9F8F5]/80 flex items-center justify-between gap-2">
-          <div className="grid grid-cols-2 gap-1.5 p-1 bg-white rounded-2xl border border-[#121417]/15 shadow-xs flex-1">
+          <div className="grid grid-cols-3 gap-1 p-1 bg-white rounded-2xl border border-[#121417]/15 shadow-xs flex-1">
             <button
               onClick={() => setCurrentView('playlists')}
-              className={`flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-black transition-all ${
+              className={`flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl text-xs font-black transition-all ${
                 currentView === 'playlists'
                   ? 'bg-[#121417] text-[#EBF755] shadow-xs'
                   : 'text-[#121417]/70 hover:text-[#121417] hover:bg-black/5'
               }`}
             >
-              <LayoutGrid className="w-3.5 h-3.5" />
+              <LayoutGrid className="w-3 h-3" />
               <span>Playlists</span>
             </button>
 
             <button
               onClick={() => setCurrentView('workspace')}
               disabled={!activeCourse}
-              className={`flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-black transition-all ${
+              className={`flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl text-xs font-black transition-all ${
                 currentView === 'workspace'
                   ? 'bg-[#121417] text-[#EBF755] shadow-xs'
                   : activeCourse 
@@ -70,8 +70,20 @@ export const Sidebar: React.FC = () => {
                   : 'opacity-40 cursor-not-allowed text-[#121417]/40'
               }`}
             >
-              <Tv className="w-3.5 h-3.5" />
+              <Tv className="w-3 h-3" />
               <span>Workspace</span>
+            </button>
+
+            <button
+              onClick={() => setCurrentView('notes')}
+              className={`flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl text-xs font-black transition-all ${
+                currentView === 'notes'
+                  ? 'bg-[#121417] text-[#EBF755] shadow-xs'
+                  : 'text-[#121417]/70 hover:text-[#121417] hover:bg-black/5'
+              }`}
+            >
+              <FileText className="w-3 h-3" />
+              <span>Notes</span>
             </button>
           </div>
           <button
@@ -116,26 +128,26 @@ export const Sidebar: React.FC = () => {
   const progressPercent = totalVideos > 0 ? Math.round((completedVideos / totalVideos) * 100) : 0;
 
   return (
-    <aside className="w-80 sm:w-88 flex-shrink-0 h-[calc(100vh-4rem)] flex flex-col border-r border-[#121417]/10 bg-white">
-      {/* View Switcher: All Playlists vs Learning Workspace (Directly Below Logo) */}
-      <div className="p-3 border-b border-[#121417]/10 bg-[#F9F8F5]/80">
-        <div className="grid grid-cols-2 gap-1.5 p-1 bg-white rounded-2xl border border-[#121417]/15 shadow-xs">
+    <aside className="w-full sm:w-[260px] md:w-[260px] lg:w-[260px] xl:w-[280px] 2xl:w-[320px] flex-shrink-0 h-[calc(100vh-4rem)] flex flex-col border-r border-[#121417]/10 bg-white">
+      {/* View Switcher on Mobile (Hidden on desktop since Header contains view hub) */}
+      <div className="sm:hidden p-3 border-b border-[#121417]/10 bg-[#F9F8F5]/80">
+        <div className="grid grid-cols-3 gap-1 p-1 bg-white rounded-2xl border border-[#121417]/15 shadow-xs">
           <button
             onClick={() => setCurrentView('playlists')}
-            className={`flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-black transition-all ${
+            className={`flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl text-xs font-black transition-all ${
               currentView === 'playlists'
                 ? 'bg-[#121417] text-[#EBF755] shadow-xs'
                 : 'text-[#121417]/70 hover:text-[#121417] hover:bg-black/5'
             }`}
           >
-            <LayoutGrid className="w-3.5 h-3.5" />
+            <LayoutGrid className="w-3 h-3" />
             <span>Playlists</span>
           </button>
 
           <button
             onClick={() => setCurrentView('workspace')}
             disabled={!activeCourse}
-            className={`flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-black transition-all ${
+            className={`flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl text-xs font-black transition-all ${
               currentView === 'workspace'
                 ? 'bg-[#121417] text-[#EBF755] shadow-xs'
                 : activeCourse 
@@ -143,8 +155,20 @@ export const Sidebar: React.FC = () => {
                 : 'opacity-40 cursor-not-allowed text-[#121417]/40'
             }`}
           >
-            <Tv className="w-3.5 h-3.5" />
+            <Tv className="w-3 h-3" />
             <span>Workspace</span>
+          </button>
+
+          <button
+            onClick={() => setCurrentView('notes')}
+            className={`flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl text-xs font-black transition-all ${
+              currentView === 'notes'
+                ? 'bg-[#121417] text-[#EBF755] shadow-xs'
+                : 'text-[#121417]/70 hover:text-[#121417] hover:bg-black/5'
+            }`}
+          >
+            <FileText className="w-3 h-3" />
+            <span>Notes</span>
           </button>
         </div>
       </div>
@@ -367,11 +391,6 @@ export const Sidebar: React.FC = () => {
             );
           })
         )}
-      </div>
-
-      {/* Sidebar Sponsor / Google Ad Slot */}
-      <div className="px-3 py-1 border-t border-[#121417]/10 bg-white">
-        <AdBanner slotId="sidebar-track-slot" format="sidebar" className="my-1" />
       </div>
 
       {/* Footer Track Summary */}

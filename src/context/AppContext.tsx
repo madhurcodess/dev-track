@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import type { Course, VideoItem, PomodoroMode, PomodoroSettings, PomodoroStats } from '../types';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import type { Course, VideoItem, PomodoroMode, PomodoroSettings, PomodoroStats, VideoNote } from '../types';
 import { soundManager } from '../utils/audio';
 import confetti from 'canvas-confetti';
+import debounce from 'lodash.debounce';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { 
   fetchUserCoursesFromCloud, 
@@ -9,9 +10,12 @@ import {
   deleteUserCourseFromCloud,
   fetchUserNotesFromCloud,
   upsertUserNoteToCloud,
+  deleteUserNoteFromCloud,
   fetchUserStreakFromCloud,
   upsertUserStreakToCloud
 } from '../services/db';
+import { CODER_ARMY_JAVA_57_VIDEOS } from '../data/javaCourseData';
+import { resolvePlaylistTitles, isGenericLectureTitle } from '../utils/youtubeTitles';
 
 export interface TimerCelebrationState {
   type: 'work' | 'break';
@@ -36,8 +40,15 @@ interface AppContextType {
   resetAllData: () => void;
 
   // Notes
-  getNoteForCurrentVideo: () => string;
-  saveNoteForCurrentVideo: (content: string) => void;
+  notes: Record<string, VideoNote>;
+  getNoteForCurrentVideo: () => VideoNote;
+  saveNoteForCurrentVideo: (noteUpdate: Partial<VideoNote>) => void;
+  saveNote: (key: string, noteUpdate: Partial<VideoNote>) => void;
+  deleteNote: (key: string) => void;
+  createNote: (courseId?: string, videoId?: string, title?: string) => string;
+  createGeneralNote: (title?: string) => string;
+  activeGeneralNoteKey: string;
+  setActiveGeneralNoteKey: (key: string) => void;
   isNoteSaving: boolean;
   lastSavedTime: string | null;
 
@@ -47,6 +58,7 @@ interface AppContextType {
   isPomodoroRunning: boolean;
   pomodoroSettings: PomodoroSettings;
   pomodoroStats: PomodoroStats;
+  recordDailyActivity: (extraMinutes?: number) => void;
   startPomodoro: () => void;
   pausePomodoro: () => void;
   resetPomodoro: () => void;
@@ -82,9 +94,9 @@ interface AppContextType {
   setIsAddModalOpen: (open: boolean) => void;
   hasClerkKey: boolean;
 
-  // View Navigation: 'playlists' (hub) or 'workspace' (3-panel player)
-  currentView: 'playlists' | 'workspace';
-  setCurrentView: (view: 'playlists' | 'workspace') => void;
+  // View Navigation: 'playlists' (hub), 'workspace' (player), or 'notes' (dedicated notes page)
+  currentView: 'playlists' | 'workspace' | 'notes';
+  setCurrentView: (view: 'playlists' | 'workspace' | 'notes') => void;
 
   // Playback Resume & Position Tracking (Indexed by courseId and videoId)
   savePlaybackPosition: (courseId: string, videoId: string, seconds: number) => void;
@@ -136,8 +148,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({
   const [isCloudSyncing, setIsCloudSyncing] = useState<boolean>(false);
   const [timerCelebration, setTimerCelebration] = useState<TimerCelebrationState | null>(null);
 
-  // View Navigation: 'playlists' (hub) or 'workspace' (player & notes)
-  const [currentView, setCurrentView] = useState<'playlists' | 'workspace'>('playlists');
+  // View Navigation: 'playlists' (hub), 'workspace' (player & notes), or 'notes' (dedicated page)
+  const [currentView, setCurrentView] = useState<'playlists' | 'workspace' | 'notes'>('playlists');
 
   // Playback positions per video ID
   const [playbackPositions, setPlaybackPositions] = useState<Record<string, number>>(() => {
@@ -188,7 +200,27 @@ export const AppProvider: React.FC<AppProviderProps> = ({
       const saved = localStorage.getItem(STORAGE_KEYS.COURSES);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) {
+          // Immediately resolve any known Coder Army 57 course lectures or generic titles
+          const armyMap = new Map(CODER_ARMY_JAVA_57_VIDEOS.map(v => [v.youtubeId, v.title]));
+          return parsed.map((course: Course) => {
+            const isCoderArmy = 
+              course.playlistId === 'PLQEaRBV9gAFsR15tNo2QLF9d2qc-c018p' ||
+              course.videos.some(v => v.youtubeId === 'LBqE4YOvhyc' || v.youtubeId === 'pdS8_smlsXA' || v.youtubeId === 'NtmULLvsABc');
+
+            if (isCoderArmy) {
+              const enrichedVideos = course.videos.map((v) => {
+                const knownTitle = armyMap.get(v.youtubeId);
+                if (knownTitle && (isGenericLectureTitle(v.title) || v.title.startsWith('Lecture '))) {
+                  return { ...v, title: knownTitle };
+                }
+                return v;
+              });
+              return { ...course, videos: enrichedVideos };
+            }
+            return course;
+          });
+        }
       }
     } catch (e) {
       console.error('Failed to load courses from localStorage', e);
@@ -212,14 +244,31 @@ export const AppProvider: React.FC<AppProviderProps> = ({
   const activeVideo = activeCourse?.videos.find(v => v.id === activeVideoId) || activeCourse?.videos[0];
 
   // 2. Notes State
-  const [notes, setNotes] = useState<Record<string, string>>(() => {
+  const [notes, setNotes] = useState<Record<string, VideoNote>>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.NOTES);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') return parsed;
+      }
     } catch (e) {
       console.error('Failed to load notes from localStorage', e);
     }
-    return {};
+    return {
+      general_default: {
+        videoId: 'default',
+        courseId: 'general',
+        title: 'General Quick Notes',
+        content: '',
+        color: '#ffffff',
+        isPinned: false,
+        updatedAt: Date.now(),
+      }
+    };
+  });
+
+  const [activeGeneralNoteKey, setActiveGeneralNoteKey] = useState<string>(() => {
+    return 'general_default';
   });
 
   const [isNoteSaving, setIsNoteSaving] = useState<boolean>(false);
@@ -234,18 +283,42 @@ export const AppProvider: React.FC<AppProviderProps> = ({
     return DEFAULT_POMO_SETTINGS;
   });
 
+  const getDaysDifference = (dateStr1: string, dateStr2: string): number => {
+    try {
+      const d1 = new Date(dateStr1 + 'T00:00:00');
+      const d2 = new Date(dateStr2 + 'T00:00:00');
+      const diffTime = d2.getTime() - d1.getTime();
+      return Math.round(diffTime / (1000 * 60 * 60 * 24));
+    } catch {
+      return 0;
+    }
+  };
+
   const [pomodoroStats, setPomodoroStats] = useState<PomodoroStats>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.POMODORO_STATS);
       if (saved) {
         const parsed = JSON.parse(saved);
         const today = new Date().toISOString().split('T')[0];
-        if (parsed.lastActiveDate !== today) {
-          return {
-            ...parsed,
-            todayFocusMinutes: 0,
-            lastActiveDate: today,
-          };
+        if (parsed.lastActiveDate) {
+          const daysDiff = getDaysDifference(parsed.lastActiveDate, today);
+          if (daysDiff === 0) {
+            return parsed;
+          } else if (daysDiff === 1) {
+            // Yesterday was active -> streak is alive! Reset today's focus minutes, preserve streakDays and preserve lastActiveDate so activity today increments it!
+            return {
+              ...parsed,
+              todayFocusMinutes: 0,
+            };
+          } else if (daysDiff > 1) {
+            // Missed at least 1 full day -> streak resets to 1
+            return {
+              ...parsed,
+              todayFocusMinutes: 0,
+              streakDays: 1,
+              lastActiveDate: today,
+            };
+          }
         }
         return parsed;
       }
@@ -327,6 +400,26 @@ export const AppProvider: React.FC<AppProviderProps> = ({
     }
   }, [courses]);
 
+  // Dynamically resolve any generic lecture titles ("Lecture 06", etc.) into real YouTube titles
+  useEffect(() => {
+    if (!activeCourse || !activeCourse.videos || activeCourse.videos.length === 0) return;
+    const hasGeneric = activeCourse.videos.some(v => v.youtubeId && isGenericLectureTitle(v.title));
+    if (!hasGeneric) return;
+
+    let isMounted = true;
+    resolvePlaylistTitles(activeCourse.videos, (updatedList) => {
+      if (isMounted) {
+        setCourses(prevCourses =>
+          prevCourses.map(c => (c.id === activeCourse.id ? { ...c, videos: updatedList } : c))
+        );
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeCourse?.id, activeCourse?.videos]);
+
   // Save active course & video selection
   const setActiveCourseId = useCallback((id: string) => {
     setActiveCourseIdState(id);
@@ -365,6 +458,36 @@ export const AppProvider: React.FC<AppProviderProps> = ({
     } catch {}
   }, [pomodoroStats]);
 
+  // Record daily study activity and increment streak on consecutive days
+  const recordDailyActivity = useCallback((extraMinutes: number = 0) => {
+    const today = new Date().toISOString().split('T')[0];
+    setPomodoroStats(prev => {
+      const daysDiff = prev.lastActiveDate ? getDaysDifference(prev.lastActiveDate, today) : 0;
+      let nextStreak = prev.streakDays;
+      if (daysDiff === 1) {
+        // Studying on the next consecutive day!
+        nextStreak = (prev.streakDays || 1) + 1;
+      } else if (daysDiff > 1) {
+        // Missed days
+        nextStreak = 1;
+      } else if (daysDiff === 0 && (!prev.streakDays || prev.streakDays < 1)) {
+        nextStreak = 1;
+      }
+
+      const updated: PomodoroStats = {
+        ...prev,
+        streakDays: Math.max(1, nextStreak),
+        todayFocusMinutes: prev.todayFocusMinutes + extraMinutes,
+        sessionsCompleted: extraMinutes > 0 ? prev.sessionsCompleted + 1 : prev.sessionsCompleted,
+        lastActiveDate: today,
+      };
+      if (userId) {
+        upsertUserStreakToCloud(userId, updated);
+      }
+      return updated;
+    });
+  }, [userId]);
+
   // Toggle Video Completion
   const toggleVideoCompletion = useCallback((courseId: string, videoId: string) => {
     setCourses(prev => {
@@ -374,6 +497,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({
           if (v.id !== videoId) return v;
           const nextCompleted = !v.completed;
           if (nextCompleted) {
+            recordDailyActivity(0);
             const remaining = c.videos.filter(x => x.id !== videoId && !x.completed);
             if (remaining.length === 0) {
               soundManager.playSuccess();
@@ -424,6 +548,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({
       });
 
       if (isFirstTime) {
+        recordDailyActivity(0);
         soundManager.playCheck();
         const course = prev.find(c => c.id === courseId);
         const remaining = course ? course.videos.filter(x => x.id !== videoId && !x.completed) : [];
@@ -526,30 +651,129 @@ export const AppProvider: React.FC<AppProviderProps> = ({
 
   // Notes operations
   const currentNoteKey = `${activeCourseId}_${activeVideo?.id || ''}`;
-  const getNoteForCurrentVideo = useCallback(() => {
-    return notes[currentNoteKey] ?? (activeVideo ? `# Notes: ${activeVideo.title}\n\n- Key concepts:\n- ` : '');
-  }, [notes, currentNoteKey, activeVideo]);
+  const getNoteForCurrentVideo = useCallback((): VideoNote => {
+    return notes[currentNoteKey] ?? {
+      videoId: activeVideo?.id || '',
+      courseId: activeCourseId,
+      title: activeVideo?.title || 'Untitled Note',
+      content: '',
+      color: '#ffffff',
+      isPinned: false,
+      updatedAt: Date.now()
+    };
+  }, [notes, currentNoteKey, activeVideo, activeCourseId]);
 
-  const saveTimeoutRef = useRef<number | null>(null);
-  const saveNoteForCurrentVideo = useCallback((content: string) => {
+  const debouncedSyncToCloud = useMemo(
+    () =>
+      debounce((uid: string, noteToSave: VideoNote) => {
+        upsertUserNoteToCloud(uid, noteToSave).then(() => {
+          setIsNoteSaving(false);
+          setLastSavedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        });
+      }, 800),
+    []
+  );
+
+  const saveNote = useCallback((key: string, noteUpdate: Partial<VideoNote>) => {
     setIsNoteSaving(true);
+    setNotes(prev => {
+      const existing = prev[key] ?? {
+        videoId: '',
+        courseId: '',
+        title: 'Untitled Note',
+        content: '',
+        color: '#ffffff',
+        isPinned: false,
+        updatedAt: Date.now()
+      };
+
+      const updatedNote: VideoNote = {
+        ...existing,
+        ...noteUpdate,
+        updatedAt: Date.now()
+      };
+
+      if (userId) {
+        debouncedSyncToCloud(userId, updatedNote);
+      } else {
+        setTimeout(() => {
+          setIsNoteSaving(false);
+          setLastSavedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        }, 800);
+      }
+
+      return {
+        ...prev,
+        [key]: updatedNote,
+      };
+    });
+  }, [userId, debouncedSyncToCloud]);
+
+  const saveNoteForCurrentVideo = useCallback((noteUpdate: Partial<VideoNote>) => {
+    if (!activeVideo || !activeCourseId) return;
+    saveNote(currentNoteKey, {
+      courseId: activeCourseId,
+      videoId: activeVideo.id,
+      ...noteUpdate
+    });
+  }, [activeVideo, activeCourseId, currentNoteKey, saveNote]);
+
+  const deleteNote = useCallback((key: string) => {
+    setNotes(prev => {
+      const target = prev[key];
+      if (target && userId) {
+        deleteUserNoteFromCloud(userId, target.courseId, target.videoId);
+      }
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }, [userId]);
+
+  const createNote = useCallback((courseId: string = 'general', videoId?: string, title?: string): string => {
+    const vid = videoId || `custom_${Date.now()}`;
+    const key = `${courseId}_${vid}`;
+    const newNote: VideoNote = {
+      courseId,
+      videoId: vid,
+      title: title || 'Untitled Note',
+      content: '',
+      color: '#ffffff',
+      isPinned: false,
+      updatedAt: Date.now()
+    };
     setNotes(prev => ({
       ...prev,
-      [currentNoteKey]: content,
+      [key]: newNote
     }));
-
-    if (saveTimeoutRef.current) {
-      window.clearTimeout(saveTimeoutRef.current);
+    if (userId) {
+      debouncedSyncToCloud(userId, newNote);
     }
-    saveTimeoutRef.current = window.setTimeout(() => {
-      setIsNoteSaving(false);
-      setLastSavedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-      // Sync note to cloud
-      if (userId && activeVideo) {
-        upsertUserNoteToCloud(userId, activeVideo.id, content);
-      }
-    }, 600);
-  }, [currentNoteKey, userId, activeVideo]);
+    return key;
+  }, [userId, debouncedSyncToCloud]);
+
+  const createGeneralNote = useCallback((title?: string): string => {
+    const vid = `note_${Date.now()}`;
+    const key = `general_${vid}`;
+    const newNote: VideoNote = {
+      courseId: 'general',
+      videoId: vid,
+      title: title || 'Quick Note',
+      content: '',
+      color: '#ffffff',
+      isPinned: false,
+      updatedAt: Date.now()
+    };
+    setNotes(prev => ({
+      ...prev,
+      [key]: newNote
+    }));
+    setActiveGeneralNoteKey(key);
+    if (userId) {
+      debouncedSyncToCloud(userId, newNote);
+    }
+    return key;
+  }, [userId, debouncedSyncToCloud]);
 
   // Pomodoro Actions
   const timerIntervalRef = useRef<number | null>(null);
@@ -606,21 +830,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({
         origin: { y: 0.6 },
       });
 
-      const today = new Date().toISOString().split('T')[0];
-      setPomodoroStats(prev => {
-        const isConsecutiveDay = prev.lastActiveDate !== today;
-        const newStreak = isConsecutiveDay ? prev.streakDays + 1 : prev.streakDays;
-        const updated = {
-          sessionsCompleted: prev.sessionsCompleted + 1,
-          todayFocusMinutes: prev.todayFocusMinutes + pomodoroSettings.workDuration,
-          streakDays: newStreak,
-          lastActiveDate: today,
-        };
-        if (userId) {
-          upsertUserStreakToCloud(userId, updated);
-        }
-        return updated;
-      });
+      recordDailyActivity(pomodoroSettings.workDuration);
 
       // Trigger Celebration Modal for deep work completion
       setTimerCelebration({
@@ -634,7 +844,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({
         durationMinutes: pomodoroMode === 'shortBreak' ? pomodoroSettings.shortBreakDuration : pomodoroSettings.longBreakDuration,
       });
     }
-  }, [pomodoroMode, pomodoroSettings, userId]);
+  }, [pomodoroMode, pomodoroSettings, recordDailyActivity]);
 
   const startBreakAfterWork = useCallback(() => {
     setTimerCelebration(null);
@@ -712,8 +922,15 @@ export const AppProvider: React.FC<AppProviderProps> = ({
         updateCourseVideos,
         deleteCourse,
         resetAllData,
+        notes,
         getNoteForCurrentVideo,
         saveNoteForCurrentVideo,
+        saveNote,
+        deleteNote,
+        createNote,
+        createGeneralNote,
+        activeGeneralNoteKey,
+        setActiveGeneralNoteKey,
         isNoteSaving,
         lastSavedTime,
         pomodoroMode,
@@ -721,6 +938,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({
         isPomodoroRunning,
         pomodoroSettings,
         pomodoroStats,
+        recordDailyActivity,
         startPomodoro,
         pausePomodoro,
         resetPomodoro,

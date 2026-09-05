@@ -7,8 +7,10 @@ import { NotesEditor } from './components/NotesEditor';
 import { AddCourseModal } from './components/AddCourseModal';
 import { LandingPage } from './components/LandingPage';
 import { PlaylistsView } from './components/PlaylistsView';
+import { NotesView } from './components/NotesView';
 import { CompactTimerBar } from './components/CompactTimerBar';
 import { TimerCelebrationModal } from './components/TimerCelebrationModal';
+import { AdBanner } from './components/AdBanner';
 import { formatTime } from './utils/youtube';
 import { SignedIn, SignedOut, useUser } from '@clerk/clerk-react';
 import { Home, PanelLeft, PanelRight } from 'lucide-react';
@@ -39,7 +41,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onBackToLanding }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
-      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+      const isInput = 
+        !target ||
+        target.tagName === 'INPUT' || 
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable ||
+        Boolean(target.closest?.('[contenteditable="true"]')) ||
+        Boolean(target.closest?.('.ProseMirror')) ||
+        Boolean(target.closest?.('.tiptap'));
 
       // Alt + T: Insert timestamp note anytime
       if (e.altKey && (e.key === 't' || e.key === 'T')) {
@@ -47,7 +56,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onBackToLanding }) => {
         const currentSec = getCurrentPlayerTime();
         const formatted = formatTime(currentSec);
         const existing = getNoteForCurrentVideo();
-        saveNoteForCurrentVideo(existing + `\n- [${formatted}] `);
+        saveNoteForCurrentVideo({ content: existing.content + `<p><br></p><p>▶ [${formatted}] </p>` });
         return;
       }
 
@@ -103,9 +112,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onBackToLanding }) => {
       {/* Header Bar */}
       <Header />
 
-      {/* Dynamic Content: All Playlists Hub vs. 3-Panel Learning Workspace */}
+      {/* Dynamic Content: Playlists Hub vs. Notes Hub vs. Learning Workspace */}
       {currentView === 'playlists' ? (
         <PlaylistsView />
+      ) : currentView === 'notes' ? (
+        <NotesView />
       ) : (
         <div className="flex-1 flex min-h-0 relative overflow-hidden">
           {/* Re-open Left Sidebar Tab (when collapsed) */}
@@ -140,12 +151,17 @@ const Dashboard: React.FC<DashboardProps> = ({ onBackToLanding }) => {
 
           {/* Right Column: Timer container arranged directly above Contextual Notes area */}
           {!isTheaterMode && isNotesOpen && (
-            <section className="w-full sm:w-[380px] lg:w-[420px] xl:w-[460px] flex-shrink-0 h-full flex flex-col min-h-0 border-l border-[#121417]/10 bg-white">
+            <section className="w-full sm:w-[320px] md:w-[320px] lg:w-[320px] xl:w-[360px] 2xl:w-[420px] flex-shrink-0 h-full flex flex-col min-h-0 border-l border-[#121417]/10 bg-white">
               {/* Rectangular Pomodoro Timer Container placed directly above notes */}
               <CompactTimerBar />
 
               {/* Single-Pane WYSIWYG Contextual Notes Editor */}
               <NotesEditor />
+
+              {/* Rectangular Ad Container Below Notes Section */}
+              <div className="px-3 py-2 border-t border-[#121417]/10 bg-[#F9F8F5]/60 flex-shrink-0">
+                <AdBanner slotId="workspace-right-bottom-ad" format="sidebar" />
+              </div>
             </section>
           )}
         </div>

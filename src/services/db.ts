@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import type { Course, PomodoroStats } from '../types';
+import type { Course, PomodoroStats, VideoNote } from '../types';
 
 /**
  * Supabase Data Service
@@ -84,12 +84,12 @@ export async function deleteUserCourseFromCloud(userId: string, courseId: string
 }
 
 // 2. User Notes
-export async function fetchUserNotesFromCloud(userId: string): Promise<Record<string, string> | null> {
+export async function fetchUserNotesFromCloud(userId: string): Promise<Record<string, VideoNote> | null> {
   if (!isSupabaseConfigured || !supabase || !userId) return null;
   try {
     const { data, error } = await supabase
       .from('user_notes')
-      .select('video_id, content')
+      .select('course_id, video_id, title, content, color, is_pinned, updated_at')
       .eq('user_id', userId);
 
     if (error) {
@@ -97,10 +97,20 @@ export async function fetchUserNotesFromCloud(userId: string): Promise<Record<st
       return null;
     }
 
-    const notesMap: Record<string, string> = {};
+    const notesMap: Record<string, VideoNote> = {};
     if (data) {
       data.forEach(row => {
-        notesMap[row.video_id] = row.content || '';
+        // Use the same composite key as AppContext
+        const key = `${row.course_id}_${row.video_id}`;
+        notesMap[key] = {
+          videoId: row.video_id,
+          courseId: row.course_id,
+          title: row.title || '',
+          content: row.content || '',
+          color: row.color || '#ffffff',
+          isPinned: row.is_pinned || false,
+          updatedAt: row.updated_at ? new Date(row.updated_at).getTime() : Date.now(),
+        };
       });
     }
     return notesMap;
@@ -110,18 +120,22 @@ export async function fetchUserNotesFromCloud(userId: string): Promise<Record<st
   }
 }
 
-export async function upsertUserNoteToCloud(userId: string, videoId: string, content: string): Promise<boolean> {
+export async function upsertUserNoteToCloud(userId: string, note: VideoNote): Promise<boolean> {
   if (!isSupabaseConfigured || !supabase || !userId) return false;
   try {
-    const noteId = `${userId}_${videoId}`;
+    const noteId = `${userId}_${note.courseId}_${note.videoId}`;
     const { error } = await supabase
       .from('user_notes')
       .upsert({
         id: noteId,
         user_id: userId,
-        video_id: videoId,
-        content,
-        updated_at: new Date().toISOString(),
+        course_id: note.courseId,
+        video_id: note.videoId,
+        title: note.title,
+        content: note.content,
+        color: note.color,
+        is_pinned: note.isPinned,
+        updated_at: new Date(note.updatedAt).toISOString(),
       });
 
     if (error) {
@@ -131,6 +145,26 @@ export async function upsertUserNoteToCloud(userId: string, videoId: string, con
     return true;
   } catch (err) {
     console.warn('Error saving note to Supabase:', err);
+    return false;
+  }
+}
+
+export async function deleteUserNoteFromCloud(userId: string, courseId: string, videoId: string): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase || !userId) return false;
+  try {
+    const noteId = `${userId}_${courseId}_${videoId}`;
+    const { error } = await supabase
+      .from('user_notes')
+      .delete()
+      .eq('id', noteId);
+
+    if (error) {
+      console.warn('Supabase deleteUserNote error:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('Error deleting note from Supabase:', err);
     return false;
   }
 }

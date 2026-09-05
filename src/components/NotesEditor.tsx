@@ -1,196 +1,82 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { formatTime, parseTimestampToSeconds } from '../utils/youtube';
+import { formatTime } from '../utils/youtube';
+import type { VideoNote } from '../types';
 import { 
-  Bold, 
-  Italic, 
-  Heading2, 
-  List, 
-  Quote, 
-  FileDown, 
-  Copy, 
-  Check, 
-  Clock, 
-  Edit3, 
-  Terminal
+  Bold, Italic, Strikethrough, List, ListTodo, 
+  Pin, Palette, Edit3, Clock, Check, Copy, ChevronDown,
+  Type, X, Tv, FileText, Plus
 } from 'lucide-react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import TaskList from '@tiptap/extension-task-list';
+import TaskItem from '@tiptap/extension-task-item';
+import { Node, mergeAttributes } from '@tiptap/core';
 
-/**
- * Converts a raw Markdown string into HTML formatted for the WYSIWYG editor.
- * Transforms [MM:SS] timestamp tags into interactive clickable buttons.
- */
-function markdownToWysiwygHtml(md: string): string {
-  if (!md) return '<p><br></p>';
+// Custom Extension for Interactive Timestamps
+const TimestampNode = Node.create({
+  name: 'timestamp',
+  group: 'inline',
+  inline: true,
+  selectable: true,
+  atom: true,
+  addAttributes() {
+    return {
+      'data-sec': { default: null },
+      text: { default: '' },
+    };
+  },
+  parseHTML() {
+    return [{ tag: 'button.timestamp-pill' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return [
+      'button',
+      mergeAttributes(HTMLAttributes, {
+        class: 'timestamp-pill inline-flex items-center gap-1 font-mono font-black text-[11px] px-2 py-0.5 rounded-full bg-[#EBF755] text-black border border-[#121417]/30 shadow-xs cursor-pointer hover:bg-[#E2EF43] mx-1 transition-transform active:scale-95 select-none',
+        contenteditable: 'false',
+        type: 'button',
+      }),
+      HTMLAttributes.text,
+    ];
+  },
+});
 
-  const lines = md.split('\n');
-  const htmlLines: string[] = [];
-  let inCodeBlock = false;
-  let codeBlockLines: string[] = [];
+export const PRESET_NOTE_COLORS = [
+  { name: 'Default', hex: '#ffffff' },
+  { name: 'Coral', hex: '#f28b82' },
+  { name: 'Peach', hex: '#fbbc04' },
+  { name: 'Sand', hex: '#fff475' },
+  { name: 'Mint', hex: '#ccff90' },
+  { name: 'Teal', hex: '#a7ffeb' },
+  { name: 'Sky', hex: '#cbf0f8' },
+  { name: 'Periwinkle', hex: '#aecbfa' },
+  { name: 'Lavender', hex: '#d7aefb' },
+  { name: 'Blush', hex: '#fdcfe8' },
+];
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    // Code block toggle
-    if (line.trim().startsWith('```')) {
-      if (!inCodeBlock) {
-        inCodeBlock = true;
-        codeBlockLines = [];
-      } else {
-        inCodeBlock = false;
-        const codeContent = codeBlockLines.join('\n');
-        htmlLines.push(`<pre class="bg-[#121417] text-white p-3 rounded-xl my-2 font-mono text-xs overflow-x-auto"><code>${escapeHtml(codeContent)}</code></pre>`);
-      }
-      continue;
-    }
-
-    if (inCodeBlock) {
-      codeBlockLines.push(line);
-      continue;
-    }
-
-    // Heading 1 or 2
-    if (line.startsWith('## ')) {
-      htmlLines.push(`<h2 class="text-base font-extrabold text-[#121417] mt-3 mb-1.5">${renderInline(line.substring(3))}</h2>`);
-      continue;
-    }
-    if (line.startsWith('# ')) {
-      htmlLines.push(`<h1 class="text-lg font-black text-[#121417] mt-2 mb-2 pb-1 border-b border-[#121417]/10">${renderInline(line.substring(2))}</h1>`);
-      continue;
-    }
-
-    // Blockquote
-    if (line.startsWith('> ')) {
-      htmlLines.push(`<blockquote class="border-l-4 border-[#EBF755] pl-3 py-1 my-2 italic text-[#121417]/80 bg-[#F9F8F5] rounded-r-lg">${renderInline(line.substring(2))}</blockquote>`);
-      continue;
-    }
-
-    // Unordered List
-    if (line.startsWith('- ') || line.startsWith('* ')) {
-      htmlLines.push(`<li class="ml-4 list-disc text-xs text-[#121417] my-0.5 leading-relaxed">${renderInline(line.substring(2))}</li>`);
-      continue;
-    }
-
-    // Empty line
-    if (!line.trim()) {
-      htmlLines.push('<p><br></p>');
-      continue;
-    }
-
-    // Standard paragraph
-    htmlLines.push(`<p class="text-xs text-[#121417] my-1 leading-relaxed">${renderInline(line)}</p>`);
-  }
-
-  if (inCodeBlock && codeBlockLines.length > 0) {
-    htmlLines.push(`<pre class="bg-[#121417] text-white p-3 rounded-xl my-2 font-mono text-xs overflow-x-auto"><code>${escapeHtml(codeBlockLines.join('\n'))}</code></pre>`);
-  }
-
-  return htmlLines.join('');
+export interface NotesEditorProps {
+  noteKey?: string;
+  onClose?: () => void;
+  fullWidth?: boolean;
 }
 
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-function renderInline(text: string): string {
-  let res = escapeHtml(text);
-
-  // Replace timestamps [04:15] or [1:23:45] with interactive pills
-  res = res.replace(/\[(\d{1,2}:\d{2}(?::\d{2})?)\]/g, (_match, timeStr) => {
-    const sec = parseTimestampToSeconds(timeStr) || 0;
-    return `<button type="button" class="timestamp-pill inline-flex items-center gap-1 font-mono font-black text-[11px] px-2 py-0.5 rounded-full bg-[#EBF755] text-black border border-[#121417]/30 shadow-xs cursor-pointer hover:bg-[#E2EF43] mx-1 transition-transform active:scale-95 select-none" data-sec="${sec}" contenteditable="false">▶ [${timeStr}]</button>`;
-  });
-
-  // Bold
-  res = res.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-  // Italic
-  res = res.replace(/\*(.*?)\*/g, '<em>$1</em>');
-  // Inline code
-  res = res.replace(/`([^`]+)`/g, '<code class="px-1.5 py-0.5 bg-[#121417]/10 rounded font-mono text-[11px] text-[#121417] font-semibold">$1</code>');
-
-  return res;
-}
-
-/**
- * Converts DOM tree inside contentEditable back into a clean Markdown string.
- */
-function wysiwygHtmlToMarkdown(element: HTMLElement): string {
-  const traverse = (node: Node): string => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      return node.textContent || '';
-    }
-
-    if (node.nodeType !== Node.ELEMENT_NODE) {
-      return '';
-    }
-
-    const el = node as HTMLElement;
-    const tag = el.tagName.toLowerCase();
-
-    // Check for timestamp button
-    if (el.classList.contains('timestamp-pill')) {
-      const match = el.textContent?.match(/\[(.*?)\]/);
-      return match ? `[${match[1]}]` : (el.textContent || '');
-    }
-
-    if (tag === 'strong' || tag === 'b') {
-      return `**${Array.from(el.childNodes).map(traverse).join('')}**`;
-    }
-
-    if (tag === 'em' || tag === 'i') {
-      return `*${Array.from(el.childNodes).map(traverse).join('')}*`;
-    }
-
-    if (tag === 'code' && el.parentElement?.tagName.toLowerCase() !== 'pre') {
-      return `\`${el.textContent}\``;
-    }
-
-    if (tag === 'pre') {
-      return `\n\`\`\`\n${el.textContent || ''}\n\`\`\`\n`;
-    }
-
-    if (tag === 'h1') {
-      return `\n# ${Array.from(el.childNodes).map(traverse).join('')}\n`;
-    }
-
-    if (tag === 'h2') {
-      return `\n## ${Array.from(el.childNodes).map(traverse).join('')}\n`;
-    }
-
-    if (tag === 'blockquote') {
-      return `\n> ${Array.from(el.childNodes).map(traverse).join('')}\n`;
-    }
-
-    if (tag === 'li') {
-      return `\n- ${Array.from(el.childNodes).map(traverse).join('')}`;
-    }
-
-    if (tag === 'p' || tag === 'div') {
-      const childText: string = Array.from(el.childNodes).map(traverse).join('');
-      return childText ? `\n${childText}` : '\n';
-    }
-
-    if (tag === 'br') {
-      return '\n';
-    }
-
-    return Array.from(el.childNodes).map(traverse).join('');
-  };
-
-  const rawMarkdown: string = Array.from(element.childNodes).map(traverse).join('');
-  // Normalize consecutive linebreaks
-  return rawMarkdown.replace(/\n{3,}/g, '\n\n').trim();
-}
-
-export const NotesEditor: React.FC = () => {
+export const NotesEditor: React.FC<NotesEditorProps> = ({ 
+  noteKey, 
+  onClose,
+  fullWidth = false 
+}) => {
   const {
-    activeCourse,
     activeVideo,
+    activeCourse,
+    activeCourseId,
     getNoteForCurrentVideo,
     saveNoteForCurrentVideo,
+    notes,
+    saveNote,
+    createGeneralNote,
+    activeGeneralNoteKey,
+    setActiveGeneralNoteKey,
     isNoteSaving,
     lastSavedTime,
     getCurrentPlayerTime,
@@ -198,256 +84,521 @@ export const NotesEditor: React.FC = () => {
     isNotesOpen,
   } = useApp();
 
-  const editorRef = useRef<HTMLDivElement>(null);
-  const [copied, setCopied] = useState<boolean>(false);
-  const isInternalChangeRef = useRef<boolean>(false);
+  const [workspaceTab, setWorkspaceTab] = useState<'lecture' | 'general'>('lecture');
+  const [copied, setCopied] = useState(false);
+  const [isSizeDropdownOpen, setIsSizeDropdownOpen] = useState(false);
+  const [isPaletteOpen, setIsPaletteOpen] = useState(false);
+  const [isGeneralDropdownOpen, setIsGeneralDropdownOpen] = useState(false);
 
-  // Initialize and sync content when active video changes
-  useEffect(() => {
-    if (!editorRef.current) return;
-    const rawNote = getNoteForCurrentVideo();
-    isInternalChangeRef.current = true;
-    editorRef.current.innerHTML = markdownToWysiwygHtml(rawNote);
-    isInternalChangeRef.current = false;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeVideo?.id, activeCourse?.id]);
+  // List all general notes
+  const generalNotesList = Object.entries(notes)
+    .filter(([_, n]) => n.courseId === 'general' || (!n.courseId && n.videoId?.startsWith('note_')) || _ === 'general_default')
+    .map(([key, n]) => ({ key, note: n }))
+    .sort((a, b) => b.note.updatedAt - a.note.updatedAt);
 
-  // Handle content modification in contentEditable
-  const handleInput = useCallback(() => {
-    if (!editorRef.current || isInternalChangeRef.current) return;
-    const md = wysiwygHtmlToMarkdown(editorRef.current);
-    saveNoteForCurrentVideo(md);
-  }, [saveNoteForCurrentVideo]);
+  // Determine mode and target note
+  const isDirectKeyMode = Boolean(noteKey);
+  
+  // If in direct key mode (modal), use noteKey
+  // Otherwise in workspace, respect the selected tab (lecture vs general)
+  const targetKey = isDirectKeyMode 
+    ? noteKey! 
+    : workspaceTab === 'lecture'
+    ? `${activeCourseId}_${activeVideo?.id || ''}`
+    : activeGeneralNoteKey;
 
-  // Intercept click on timestamp pills to seek video
-  const handleEditorClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLElement;
-    const pill = target.closest('.timestamp-pill');
-    if (pill) {
-      e.preventDefault();
-      e.stopPropagation();
-      const secAttr = pill.getAttribute('data-sec');
-      if (secAttr) {
-        const sec = parseInt(secAttr, 10);
-        if (!isNaN(sec)) {
-          seekTo(sec);
-        }
-      } else {
-        const match = pill.textContent?.match(/\[(.*?)\]/);
-        if (match) {
-          const parsed = parseTimestampToSeconds(match[1]);
-          if (parsed !== null) {
-            seekTo(parsed);
+  const note: VideoNote = isDirectKeyMode
+    ? (notes[targetKey] ?? {
+        videoId: '',
+        courseId: '',
+        title: 'Untitled Note',
+        content: '',
+        color: '#ffffff',
+        isPinned: false,
+        updatedAt: Date.now(),
+      })
+    : workspaceTab === 'lecture'
+    ? getNoteForCurrentVideo()
+    : (notes[activeGeneralNoteKey] ?? {
+        videoId: 'default',
+        courseId: 'general',
+        title: 'General Quick Notes',
+        content: '',
+        color: '#ffffff',
+        isPinned: false,
+        updatedAt: Date.now(),
+      });
+
+  const handleUpdate = useCallback((updates: Partial<VideoNote>) => {
+    if (isDirectKeyMode) {
+      saveNote(targetKey, updates);
+    } else if (workspaceTab === 'lecture') {
+      saveNoteForCurrentVideo(updates);
+    } else {
+      saveNote(activeGeneralNoteKey, { courseId: 'general', ...updates });
+    }
+  }, [isDirectKeyMode, targetKey, workspaceTab, activeGeneralNoteKey, saveNote, saveNoteForCurrentVideo]);
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        heading: {
+          levels: [1, 2, 3],
+        },
+      }),
+      TaskList,
+      TaskItem.configure({
+        nested: true,
+      }),
+      TimestampNode,
+    ],
+    content: note.content,
+    editorProps: {
+      attributes: {
+        class: 'prose prose-sm max-w-none focus:outline-none min-h-[160px] text-xs sm:text-sm text-[#121417] leading-relaxed',
+      },
+      handleClick(_view, _pos, event) {
+        const target = event.target as HTMLElement;
+        const pill = target.closest('.timestamp-pill');
+        if (pill) {
+          event.preventDefault();
+          const sec = parseInt(pill.getAttribute('data-sec') || '0', 10);
+          if (!isNaN(sec)) {
+            seekTo(sec);
           }
+          return true;
         }
+        return false;
+      },
+    },
+    onUpdate: ({ editor }) => {
+      handleUpdate({ content: editor.getHTML() });
+    },
+  });
+
+  // Re-sync editor content when note changes externally or switching notes/videos/tabs
+  useEffect(() => {
+    if (editor && editor.getHTML() !== note.content) {
+      const currentPos = editor.state.selection.$anchor.pos;
+      editor.commands.setContent(note.content, { emitUpdate: false });
+      if (currentPos <= editor.state.doc.content.size) {
+        editor.commands.setTextSelection(currentPos);
       }
     }
-  }, [seekTo]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetKey, note.content]);
 
-  // Command Exec Helper for formatting
-  const executeCommand = (command: string, value: string | undefined = undefined) => {
-    if (!editorRef.current) return;
-    editorRef.current.focus();
-    document.execCommand(command, false, value);
-    handleInput();
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    handleUpdate({ title: e.target.value });
   };
 
-  // Insert Interactive Timestamp node at cursor
-  const handleInsertTimestamp = () => {
-    if (!editorRef.current) return;
-    editorRef.current.focus();
-
-    const currentSec = getCurrentPlayerTime();
-    const formatted = formatTime(currentSec);
-    const pillHtml = `<button type="button" class="timestamp-pill inline-flex items-center gap-1 font-mono font-black text-[11px] px-2 py-0.5 rounded-full bg-[#EBF755] text-black border border-[#121417]/30 shadow-xs cursor-pointer hover:bg-[#E2EF43] mx-1 transition-transform active:scale-95 select-none" data-sec="${currentSec}" contenteditable="false">▶ [${formatted}]</button>&nbsp;`;
-
-    document.execCommand('insertHTML', false, pillHtml);
-    handleInput();
+  const togglePin = () => {
+    handleUpdate({ isPinned: !note.isPinned });
   };
 
-  // Insert Code Snippet
-  const handleInsertCodeSnippet = () => {
-    if (!editorRef.current) return;
-    editorRef.current.focus();
-    const snippetHtml = `<pre class="bg-[#121417] text-white p-3 rounded-xl my-2 font-mono text-xs overflow-x-auto"><code>// Code snippet\nSystem.out.println("DevTrack learning!");</code></pre><p><br></p>`;
-    document.execCommand('insertHTML', false, snippetHtml);
-    handleInput();
+  const changeColor = (color: string) => {
+    handleUpdate({ color });
+    setIsPaletteOpen(false);
   };
 
-  // Copy Markdown
-  const handleCopyNotes = async () => {
-    if (!editorRef.current) return;
+  const handleInsertTimestamp = useCallback(() => {
+    if (!editor) return;
+    const sec = getCurrentPlayerTime();
+    const formatted = formatTime(sec);
+    editor.chain().focus().insertContent({
+      type: 'timestamp',
+      attrs: { 'data-sec': sec, text: `▶ [${formatted}]` }
+    }).insertContent(' ').run();
+  }, [editor, getCurrentPlayerTime]);
+
+  const copyNotes = async () => {
+    if (!editor) return;
     try {
-      const md = wysiwygHtmlToMarkdown(editorRef.current);
-      await navigator.clipboard.writeText(md);
+      await navigator.clipboard.writeText(editor.getText());
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {}
   };
 
-  // Export as .md
-  const handleExportMarkdown = () => {
-    if (!editorRef.current) return;
-    const md = wysiwygHtmlToMarkdown(editorRef.current);
-    const courseTitle = activeCourse?.title || 'Course';
-    const filename = `${courseTitle} - ${activeVideo?.title || 'Notes'}.md`.replace(/[/\\?%*:|"<>]/g, '-');
-    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(url);
+  // If in workspace drawer mode and notes are toggled off
+  if (!isDirectKeyMode && !isNotesOpen) return null;
+
+  // Active text size label
+  const getCurrentTextSizeLabel = () => {
+    if (!editor) return 'Normal Text';
+    if (editor.isActive('heading', { level: 1 })) return 'Large (H1)';
+    if (editor.isActive('heading', { level: 2 })) return 'Medium (H2)';
+    if (editor.isActive('heading', { level: 3 })) return 'Small (H3)';
+    return 'Normal Text';
   };
 
-  // Export as .txt
-  const handleExportText = () => {
-    if (!editorRef.current) return;
-    const md = wysiwygHtmlToMarkdown(editorRef.current);
-    const courseTitle = activeCourse?.title || 'Course';
-    const filename = `${courseTitle} - ${activeVideo?.title || 'Notes'}.txt`.replace(/[/\\?%*:|"<>]/g, '-');
-    const blob = new Blob([md], { type: 'text/plain;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
-  if (!isNotesOpen) return null;
-
-  if (!activeVideo) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white">
-        <div className="w-12 h-12 rounded-2xl bg-[#D4E4FC] border-2 border-[#121417] text-[#121417] flex items-center justify-center mb-3 shadow-solid">
-          <Edit3 className="w-6 h-6" />
-        </div>
-        <h3 className="text-sm font-extrabold text-[#121417] mb-1">Contextual Notes</h3>
-        <p className="text-xs text-[#121417]/60 max-w-[200px] leading-relaxed">
-          Select a lecture from the course index to start taking rich timestamped notes.
-        </p>
-      </div>
-    );
-  }
+  // Active lecture index
+  const activeLectureIndex = activeCourse && activeVideo
+    ? activeCourse.videos.findIndex(v => v.id === activeVideo.id) + 1
+    : 1;
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-white">
-      {/* Top Action Toolbar */}
-      <div className="p-2.5 border-b border-[#121417]/10 bg-[#F9F8F5] flex items-center justify-between gap-1.5 flex-wrap">
-        <div className="flex items-center gap-1 flex-wrap">
-          {/* Interactive Timestamp Insertion Button */}
+    <div 
+      className={`flex-1 flex flex-col min-h-0 transition-colors duration-200 ${
+        fullWidth ? 'w-full' : 'border-l border-[#121417]/10'
+      }`}
+      style={{ backgroundColor: note.color || '#ffffff' }}
+    >
+      {/* Workspace Note Mode Tabs: Lecture Note vs General Notes */}
+      {!isDirectKeyMode && (
+        <div className="flex items-center border-b border-[#121417]/10 bg-[#F9F8F5]">
           <button
-            onClick={handleInsertTimestamp}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-black bg-[#EBF755] hover:bg-[#E2EF43] text-black border border-[#121417]/30 shadow-xs transition-all hover:scale-105 active:scale-95"
-            title="Insert current video timestamp"
+            onClick={() => setWorkspaceTab('lecture')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-black transition-all border-b-2 ${
+              workspaceTab === 'lecture'
+                ? 'border-[#121417] text-[#121417] bg-white shadow-2xs'
+                : 'border-transparent text-[#121417]/60 hover:text-[#121417] hover:bg-black/5'
+            }`}
           >
-            <Clock className="w-3.5 h-3.5" />
-            <span>Timestamp</span>
-          </button>
-
-          <div className="w-[1px] h-4 bg-[#121417]/20 mx-0.5" />
-
-          {/* Text Formatting Toolbar */}
-          <button
-            onClick={() => executeCommand('bold')}
-            className="p-1.5 rounded-lg text-[#121417]/70 hover:text-[#121417] hover:bg-black/5 transition-colors"
-            title="Bold"
-          >
-            <Bold className="w-3.5 h-3.5" />
+            <Tv className="w-3.5 h-3.5" />
+            <span className="truncate">Playlist / Lecture Note</span>
           </button>
 
           <button
-            onClick={() => executeCommand('italic')}
-            className="p-1.5 rounded-lg text-[#121417]/70 hover:text-[#121417] hover:bg-black/5 transition-colors"
-            title="Italic"
+            onClick={() => setWorkspaceTab('general')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-black transition-all border-b-2 ${
+              workspaceTab === 'general'
+                ? 'border-[#121417] text-[#121417] bg-white shadow-2xs'
+                : 'border-transparent text-[#121417]/60 hover:text-[#121417] hover:bg-black/5'
+            }`}
           >
-            <Italic className="w-3.5 h-3.5" />
-          </button>
-
-          <button
-            onClick={() => executeCommand('formatBlock', '<h2>')}
-            className="p-1.5 rounded-lg text-[#121417]/70 hover:text-[#121417] hover:bg-black/5 transition-colors"
-            title="Heading"
-          >
-            <Heading2 className="w-3.5 h-3.5" />
-          </button>
-
-          <button
-            onClick={() => executeCommand('insertUnorderedList')}
-            className="p-1.5 rounded-lg text-[#121417]/70 hover:text-[#121417] hover:bg-black/5 transition-colors"
-            title="Bullet List"
-          >
-            <List className="w-3.5 h-3.5" />
-          </button>
-
-          <button
-            onClick={() => executeCommand('formatBlock', '<blockquote>')}
-            className="p-1.5 rounded-lg text-[#121417]/70 hover:text-[#121417] hover:bg-black/5 transition-colors"
-            title="Quote"
-          >
-            <Quote className="w-3.5 h-3.5" />
-          </button>
-
-          <button
-            onClick={handleInsertCodeSnippet}
-            className="p-1.5 rounded-lg text-[#121417]/70 hover:text-[#121417] hover:bg-black/5 transition-colors"
-            title="Code Snippet"
-          >
-            <Terminal className="w-3.5 h-3.5" />
+            <FileText className="w-3.5 h-3.5" />
+            <span className="truncate">General Notes</span>
           </button>
         </div>
+      )}
 
-        {/* Auto-save & Status Indicator */}
-        <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#121417]/60">
-          <span className={`w-1.5 h-1.5 rounded-full ${isNoteSaving ? 'bg-amber-500 animate-ping' : 'bg-emerald-500'}`} />
-          <span>{isNoteSaving ? 'Saving...' : lastSavedTime ? `Saved ${lastSavedTime}` : 'Auto-saved'}</span>
-        </div>
-      </div>
+      {/* General Notes Selector Bar (when on General tab in Workspace) */}
+      {!isDirectKeyMode && workspaceTab === 'general' && (
+        <div className="px-3 py-1.5 bg-black/[0.03] border-b border-black/5 flex items-center justify-between gap-2">
+          <div className="relative flex-1">
+            <button
+              onClick={() => setIsGeneralDropdownOpen(!isGeneralDropdownOpen)}
+              className="w-full flex items-center justify-between px-2.5 py-1 bg-white rounded-lg border border-black/10 text-xs font-bold text-[#121417] text-left hover:bg-black/5 transition-colors"
+            >
+              <span className="truncate">{note.title || 'General Note'}</span>
+              <ChevronDown className="w-3 h-3 text-[#121417]/50 ml-1 flex-shrink-0" />
+            </button>
 
-      {/* Single-Pane WYSIWYG Content Area */}
-      <div 
-        ref={editorRef}
-        contentEditable
-        onInput={handleInput}
-        onClick={handleEditorClick}
-        className="flex-1 p-4 lg:p-5 overflow-y-auto outline-none font-sans text-xs text-[#121417] leading-relaxed selection:bg-[#EBF755] selection:text-black focus:ring-0 cursor-text"
-        style={{ minHeight: '180px' }}
-        suppressContentEditableWarning
-      />
+            {isGeneralDropdownOpen && (
+              <div className="absolute left-0 right-0 top-full mt-1 bg-white border-2 border-[#121417] rounded-xl shadow-solid-lg z-30 py-1 max-h-48 overflow-y-auto animate-fade-in">
+                <div className="px-2.5 py-1 text-[10px] font-black uppercase text-[#121417]/40">
+                  Switch General Note
+                </div>
+                {generalNotesList.map(item => (
+                  <button
+                    key={item.key}
+                    onClick={() => {
+                      setActiveGeneralNoteKey(item.key);
+                      setIsGeneralDropdownOpen(false);
+                    }}
+                    className={`w-full px-2.5 py-1.5 text-left text-xs transition-colors flex items-center justify-between ${
+                      item.key === activeGeneralNoteKey
+                        ? 'bg-[#EBF755] font-black text-black'
+                        : 'hover:bg-black/5 text-[#121417]'
+                    }`}
+                  >
+                    <span className="truncate">{item.note.title || 'Untitled'}</span>
+                    {item.note.isPinned && <Pin className="w-2.5 h-2.5 fill-current ml-1" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
-      {/* Bottom Export & Utility Bar */}
-      <div className="p-2.5 border-t border-[#121417]/10 bg-[#F9F8F5] flex items-center justify-between text-xs font-bold text-[#121417]/70">
-        <div className="flex items-center gap-1">
           <button
-            onClick={handleCopyNotes}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-[#121417]/15 hover:bg-slate-50 transition-colors"
+            onClick={() => {
+              createGeneralNote();
+              setIsGeneralDropdownOpen(false);
+            }}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-black bg-[#EBF755] hover:bg-[#E2EF43] text-black border border-[#121417]/20 transition-all flex-shrink-0"
+            title="Create new general note"
           >
-            {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-            <span className="text-[11px]">{copied ? 'Copied' : 'Copy'}</span>
+            <Plus className="w-3 h-3" />
+            <span>New</span>
           </button>
         </div>
+      )}
 
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] text-[#121417]/50 hidden sm:inline">Export:</span>
-          <button
-            onClick={handleExportMarkdown}
-            className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white border border-[#121417]/15 hover:bg-slate-50 text-[11px]"
-            title="Download as Markdown (.md)"
-          >
-            <FileDown className="w-3 h-3" />
-            <span>.md</span>
-          </button>
-          <button
-            onClick={handleExportText}
-            className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white border border-[#121417]/15 hover:bg-slate-50 text-[11px]"
-            title="Download as Plain Text (.txt)"
-          >
-            <FileDown className="w-3 h-3" />
-            <span>.txt</span>
-          </button>
+      {/* If on lecture tab in workspace but no video selected */}
+      {!isDirectKeyMode && workspaceTab === 'lecture' && !activeVideo ? (
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white">
+          <div className="w-12 h-12 rounded-2xl bg-[#D4E4FC] border-2 border-[#121417] text-[#121417] flex items-center justify-center mb-3 shadow-solid">
+            <Edit3 className="w-6 h-6" />
+          </div>
+          <h3 className="text-sm font-extrabold text-[#121417] mb-1">Lecture Notes</h3>
+          <p className="text-xs text-[#121417]/60 max-w-[200px] leading-relaxed">
+            Select a lecture from the playlist index on the left to start taking lecture notes.
+          </p>
         </div>
-      </div>
+      ) : (
+        <>
+          {/* Top Bar: Title, Context info, Pin, and Close (if modal) */}
+          <div className="p-3 sm:p-4 pb-2 flex flex-col gap-1 border-b border-black/5">
+            {/* Context Badge (if lecture note) */}
+            {!isDirectKeyMode && workspaceTab === 'lecture' && activeVideo && (
+              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-[#121417]/60">
+                <span className="bg-black/10 px-2 py-0.5 rounded-full text-[#121417]">
+                  Lecture {activeLectureIndex} of {activeCourse?.videos.length}
+                </span>
+                <span className="truncate max-w-[180px]">{activeCourse?.title}</span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between gap-3">
+              <input 
+                type="text" 
+                value={note.title} 
+                onChange={handleTitleChange} 
+                placeholder={workspaceTab === 'lecture' ? 'Lecture Note Title...' : 'General Note Title...'}
+                className="flex-1 font-black text-sm sm:text-base bg-transparent border-none outline-none placeholder-[#121417]/40 text-[#121417]"
+              />
+              <div className="flex items-center gap-1.5">
+                <button 
+                  onClick={togglePin}
+                  className={`p-1.5 rounded-full transition-all ${
+                    note.isPinned 
+                      ? 'bg-[#121417] text-[#EBF755] shadow-xs scale-105' 
+                      : 'text-[#121417]/50 hover:bg-black/5 hover:text-[#121417]'
+                  }`}
+                  title={note.isPinned ? 'Unpin Note' : 'Pin Note'}
+                >
+                  <Pin className={`w-4 h-4 ${note.isPinned ? 'fill-current' : ''}`} />
+                </button>
+
+                {onClose && (
+                  <button
+                    onClick={onClose}
+                    className="p-1.5 rounded-full text-[#121417]/50 hover:bg-black/10 hover:text-[#121417] transition-colors"
+                    title="Close Note"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Formatting Toolbar */}
+          <div className="px-3 sm:px-4 py-1.5 flex items-center justify-between gap-1.5 flex-wrap border-b border-black/5 bg-black/[0.02]">
+            <div className="flex items-center gap-1 flex-wrap">
+              {/* Timestamp Button */}
+              <button
+                onClick={handleInsertTimestamp}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-[#EBF755] hover:bg-[#E2EF43] text-black shadow-xs transition-transform active:scale-95"
+                title="Insert current video timestamp"
+              >
+                <Clock className="w-3 h-3" />
+                <span>Time</span>
+              </button>
+              
+              <div className="w-[1px] h-3.5 bg-[#121417]/15 mx-0.5" />
+
+              {editor && (
+                <>
+                  {/* Text Size Selector Dropdown */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsSizeDropdownOpen(!isSizeDropdownOpen)}
+                      className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold text-[#121417]/80 hover:bg-black/10 transition-colors border border-black/10 bg-white/70 shadow-2xs"
+                      title="Text Size"
+                    >
+                      <Type className="w-3 h-3 text-[#121417]/70" />
+                      <span>{getCurrentTextSizeLabel()}</span>
+                      <ChevronDown className="w-3 h-3 text-[#121417]/50" />
+                    </button>
+
+                    {isSizeDropdownOpen && (
+                      <div className="absolute left-0 top-full mt-1 bg-white border-2 border-[#121417] rounded-xl shadow-solid py-1 z-30 min-w-[130px] animate-fade-in">
+                        <button
+                          onClick={() => {
+                            editor.chain().focus().setParagraph().run();
+                            setIsSizeDropdownOpen(false);
+                          }}
+                          className={`w-full px-3 py-1.5 text-left text-xs font-medium hover:bg-[#EBF755] transition-colors ${
+                            !editor.isActive('heading') ? 'font-black bg-[#EBF755]/50 text-black' : 'text-[#121417]'
+                          }`}
+                        >
+                          Normal Text
+                        </button>
+                        <button
+                          onClick={() => {
+                            editor.chain().focus().toggleHeading({ level: 1 }).run();
+                            setIsSizeDropdownOpen(false);
+                          }}
+                          className={`w-full px-3 py-1.5 text-left text-sm font-black hover:bg-[#EBF755] transition-colors ${
+                            editor.isActive('heading', { level: 1 }) ? 'bg-[#EBF755]/50 text-black' : 'text-[#121417]'
+                          }`}
+                        >
+                          Large (H1)
+                        </button>
+                        <button
+                          onClick={() => {
+                            editor.chain().focus().toggleHeading({ level: 2 }).run();
+                            setIsSizeDropdownOpen(false);
+                          }}
+                          className={`w-full px-3 py-1.5 text-left text-xs font-bold hover:bg-[#EBF755] transition-colors ${
+                            editor.isActive('heading', { level: 2 }) ? 'bg-[#EBF755]/50 text-black' : 'text-[#121417]'
+                          }`}
+                        >
+                          Medium (H2)
+                        </button>
+                        <button
+                          onClick={() => {
+                            editor.chain().focus().toggleHeading({ level: 3 }).run();
+                            setIsSizeDropdownOpen(false);
+                          }}
+                          className={`w-full px-3 py-1.5 text-left text-[11px] font-bold hover:bg-[#EBF755] transition-colors ${
+                            editor.isActive('heading', { level: 3 }) ? 'bg-[#EBF755]/50 text-black' : 'text-[#121417]'
+                          }`}
+                        >
+                          Small (H3)
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Bold */}
+                  <button
+                    onClick={() => editor.chain().focus().toggleBold().run()}
+                    className={`p-1.5 rounded-lg text-[#121417]/80 hover:bg-black/10 transition-colors ${
+                      editor.isActive('bold') ? 'bg-[#121417] text-[#EBF755] shadow-2xs font-bold' : ''
+                    }`}
+                    title="Bold (Ctrl+B)"
+                  >
+                    <Bold className="w-3.5 h-3.5" />
+                  </button>
+
+                  {/* Italic */}
+                  <button
+                    onClick={() => editor.chain().focus().toggleItalic().run()}
+                    className={`p-1.5 rounded-lg text-[#121417]/80 hover:bg-black/10 transition-colors ${
+                      editor.isActive('italic') ? 'bg-[#121417] text-[#EBF755] shadow-2xs font-bold' : ''
+                    }`}
+                    title="Italic (Ctrl+I)"
+                  >
+                    <Italic className="w-3.5 h-3.5" />
+                  </button>
+
+                  {/* Strikethrough */}
+                  <button
+                    onClick={() => editor.chain().focus().toggleStrike().run()}
+                    className={`p-1.5 rounded-lg text-[#121417]/80 hover:bg-black/10 transition-colors ${
+                      editor.isActive('strike') ? 'bg-[#121417] text-[#EBF755] shadow-2xs font-bold' : ''
+                    }`}
+                    title="Strikethrough"
+                  >
+                    <Strikethrough className="w-3.5 h-3.5" />
+                  </button>
+
+                  <div className="w-[1px] h-3.5 bg-[#121417]/15 mx-0.5" />
+
+                  {/* Bullet Points */}
+                  <button
+                    onClick={() => editor.chain().focus().toggleBulletList().run()}
+                    className={`p-1.5 rounded-lg text-[#121417]/80 hover:bg-black/10 transition-colors ${
+                      editor.isActive('bulletList') ? 'bg-[#121417] text-[#EBF755] shadow-2xs font-bold' : ''
+                    }`}
+                    title="Bullet Points"
+                  >
+                    <List className="w-3.5 h-3.5" />
+                  </button>
+
+                  {/* Interactive Checkboxes / Task List */}
+                  <button
+                    onClick={() => editor.chain().focus().toggleTaskList().run()}
+                    className={`p-1.5 rounded-lg text-[#121417]/80 hover:bg-black/10 transition-colors ${
+                      editor.isActive('taskList') ? 'bg-[#121417] text-[#EBF755] shadow-2xs font-bold' : ''
+                    }`}
+                    title="Checklist / Tasks"
+                  >
+                    <ListTodo className="w-3.5 h-3.5" />
+                  </button>
+                </>
+              )}
+            </div>
+            
+            {/* Background Color Palette Picker */}
+            <div className="relative">
+              <button 
+                type="button"
+                onClick={() => setIsPaletteOpen(!isPaletteOpen)}
+                className="p-1.5 rounded-lg text-[#121417]/60 hover:bg-black/10 hover:text-[#121417] transition-colors"
+                title="Note Background Color"
+              >
+                <Palette className="w-3.5 h-3.5" />
+              </button>
+
+              {isPaletteOpen && (
+                <div className="absolute right-0 top-full mt-1 flex flex-wrap gap-1.5 bg-white p-2 rounded-2xl shadow-solid-lg border-2 border-[#121417] z-40 w-44 animate-fade-in">
+                  {PRESET_NOTE_COLORS.map(c => (
+                    <button
+                      key={c.hex}
+                      onClick={() => changeColor(c.hex)}
+                      className={`w-6 h-6 rounded-full border-2 border-black/20 hover:scale-110 transition-transform ${
+                        (note.color || '#ffffff') === c.hex ? 'ring-2 ring-[#121417] scale-105' : ''
+                      }`}
+                      style={{ backgroundColor: c.hex }}
+                      title={c.name}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Editor Content Area */}
+          <div 
+            className="flex-1 overflow-y-auto px-4 py-3 cursor-text" 
+            onClick={() => editor?.commands.focus()}
+          >
+            <EditorContent editor={editor} />
+          </div>
+
+          {/* Footer Info & Actions */}
+          <div className="p-3 border-t border-black/5 flex items-center justify-between text-[10px] text-[#121417]/60 font-medium bg-black/[0.01]">
+            <div className="flex items-center gap-1.5">
+              {isNoteSaving ? (
+                <>
+                  <Clock className="w-3 h-3 animate-pulse text-amber-500" />
+                  <span className="text-amber-600 font-bold">Saving changes...</span>
+                </>
+              ) : (
+                <>
+                  <Check className="w-3 h-3 text-emerald-500" />
+                  <span className="font-bold">{lastSavedTime ? `Saved ${lastSavedTime}` : 'All changes saved'}</span>
+                </>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={copyNotes} 
+                className="hover:text-black font-bold transition-colors flex items-center gap-1"
+                title="Copy note text to clipboard"
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-3 h-3 text-emerald-600" />
+                    <span className="text-emerald-700">Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3 h-3" />
+                    <span>Copy</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
