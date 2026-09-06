@@ -213,18 +213,19 @@ export const PlayerWorkspace: React.FC = () => {
 
   // Sync real playlist videos from YouTube iFrame API
   const syncPlaylistIfAvailable = useCallback((player: any) => {
-    if (!activeCourse?.playlistId || !player) return;
+    const curCourse = activeCourseRef.current;
+    if (!curCourse?.playlistId || !player) return;
     try {
       const playlist: string[] = typeof player.getPlaylist === 'function' ? player.getPlaylist() : [];
       const videoData = typeof player.getVideoData === 'function' ? player.getVideoData() : null;
 
       if (playlist && playlist.length > 0) {
-        const hasDummyId = activeCourse.videos.some(v => v.youtubeId === 'dQw4w9WgXcQ' || !v.youtubeId);
-        const needsUpdate = hasDummyId || activeCourse.videos.length !== playlist.length;
+        const hasDummyId = curCourse.videos.some(v => v.youtubeId === 'dQw4w9WgXcQ' || !v.youtubeId);
+        const needsUpdate = hasDummyId || curCourse.videos.length !== playlist.length;
 
         if (needsUpdate) {
           const updatedVideos: VideoItem[] = playlist.map((vId, idx) => {
-            const existing = activeCourse.videos[idx];
+            const existing = curCourse.videos.find(v => v.youtubeId === vId) || curCourse.videos[idx];
             const isFirst = idx === 0;
             const title = (isFirst && videoData?.title) 
               ? `${String(idx + 1).padStart(2, '0')}. ${videoData.title}`
@@ -233,7 +234,7 @@ export const PlayerWorkspace: React.FC = () => {
               : `Lecture ${String(idx + 1).padStart(2, '0')}`;
 
             return {
-              id: existing?.id || `vid-${activeCourse.id}-${idx}`,
+              id: existing?.id || `vid-${curCourse.id}-${idx}`,
               youtubeId: vId,
               title,
               duration: existing?.duration || '20:00',
@@ -243,11 +244,11 @@ export const PlayerWorkspace: React.FC = () => {
 
           // Instantly resolve real YouTube titles for all videos in this playlist
           resolvePlaylistTitles(updatedVideos, (resolved) => {
-            updateCourseVideos(activeCourse.id, resolved);
+            updateCourseVideos(curCourse.id, resolved);
           });
 
-          updateCourseVideos(activeCourse.id, updatedVideos);
-          if (!activeVideoId || activeCourse.videos.length <= 1) {
+          updateCourseVideos(curCourse.id, updatedVideos);
+          if (!activeVideoRef.current?.id || curCourse.videos.length <= 1) {
             setActiveVideoId(updatedVideos[0].id);
           }
         }
@@ -255,24 +256,26 @@ export const PlayerWorkspace: React.FC = () => {
     } catch (e) {
       console.warn('Playlist sync notice:', e);
     }
-  }, [activeCourse, activeVideoId, updateCourseVideos, setActiveVideoId]);
+  }, [updateCourseVideos, setActiveVideoId]);
 
   // Sync currently playing video's real title from player
   const syncVideoMetadata = useCallback((player: any) => {
-    if (!activeCourse || !player) return;
+    const curCourse = activeCourseRef.current;
+    const curVideoId = activeVideoRef.current?.id;
+    if (!curCourse || !player) return;
     try {
       const vData = typeof player.getVideoData === 'function' ? player.getVideoData() : null;
       if (!vData || !vData.title) return;
 
       const pIndex = typeof player.getPlaylistIndex === 'function' ? player.getPlaylistIndex() : -1;
-      const targetIdx = pIndex >= 0 ? pIndex : activeCourse.videos.findIndex(v => v.id === activeVideoId);
+      const targetIdx = pIndex >= 0 ? pIndex : curCourse.videos.findIndex(v => v.id === curVideoId);
 
-      if (targetIdx >= 0 && activeCourse.videos[targetIdx]) {
-        const vid = activeCourse.videos[targetIdx];
+      if (targetIdx >= 0 && curCourse.videos[targetIdx]) {
+        const vid = curCourse.videos[targetIdx];
         const isGeneric = isGenericLectureTitle(vid.title);
 
         if (isGeneric || !vid.title.includes(vData.title)) {
-          const updated = [...activeCourse.videos];
+          const updated = [...curCourse.videos];
           const prefix = `${String(targetIdx + 1).padStart(2, '0')}. `;
           const formatted = vData.title.startsWith(prefix) ? vData.title : `${prefix}${vData.title}`;
           updated[targetIdx] = {
@@ -280,11 +283,11 @@ export const PlayerWorkspace: React.FC = () => {
             youtubeId: vData.video_id || vid.youtubeId,
             title: formatted,
           };
-          updateCourseVideos(activeCourse.id, updated);
+          updateCourseVideos(curCourse.id, updated);
         }
       }
     } catch {}
-  }, [activeCourse, activeVideoId, updateCourseVideos]);
+  }, [updateCourseVideos]);
 
   // Initialize YouTube IFrame API
   useEffect(() => {

@@ -128,6 +128,7 @@ const STORAGE_KEYS = {
   COURSES: 'devtrack_courses_v2',
   ACTIVE_COURSE: 'devtrack_active_course_v2',
   ACTIVE_VIDEO: 'devtrack_active_video_v2',
+  COMPLETED_VIDEOS: 'devtrack_completed_videos_v2',
   NOTES: 'devtrack_notes_v2',
   FOLDERS: 'devtrack_user_folders_v3',
   ACTIVE_FOLDER: 'devtrack_active_folder_v3',
@@ -166,6 +167,20 @@ export const AppProvider: React.FC<AppProviderProps> = ({
 }) => {
   const [isCloudSyncing, setIsCloudSyncing] = useState<boolean>(false);
   const [timerCelebration, setTimerCelebration] = useState<TimerCelebrationState | null>(null);
+
+  // Dedicated persistent completed videos registry (courseId::videoId or courseId::youtubeId -> true)
+  const [completedVideosRegistry, setCompletedVideosRegistry] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.COMPLETED_VIDEOS);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {};
+  });
+
+  const completedVideosRef = useRef<Record<string, boolean>>(completedVideosRegistry);
+  useEffect(() => {
+    completedVideosRef.current = completedVideosRegistry;
+  }, [completedVideosRegistry]);
 
   // View Navigation: 'playlists' (hub), 'workspace' (player & notes), or 'notes' (dedicated page)
   const [currentView, setCurrentView] = useState<'playlists' | 'workspace' | 'notes'>('playlists');
@@ -222,10 +237,13 @@ export const AppProvider: React.FC<AppProviderProps> = ({
     });
   }, []);
 
-  // 1. Courses State - Starts clean and empty
+  // 1. Courses State - Starts clean and empty with persistent completion hydration
   const [courses, setCourses] = useState<Course[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.COURSES);
+      const savedRegStr = localStorage.getItem(STORAGE_KEYS.COMPLETED_VIDEOS);
+      const reg: Record<string, boolean> = savedRegStr ? JSON.parse(savedRegStr) : {};
+
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
@@ -237,8 +255,13 @@ export const AppProvider: React.FC<AppProviderProps> = ({
               course.playlistId === 'PLQEaRBV9gAFsR15tNo2QLF9d2qc-c018p' ||
               course.videos.some(v => v.youtubeId === 'LBqE4YOvhyc' || v.youtubeId === 'pdS8_smlsXA' || v.youtubeId === 'NtmULLvsABc');
 
+            const videosWithCompletion = course.videos.map(v => {
+              const isComp = v.completed || reg[`${course.id}::${v.id}`] || (v.youtubeId ? reg[`${course.id}::${v.youtubeId}`] : false) || false;
+              return { ...v, completed: isComp };
+            });
+
             if (isCoderArmy) {
-              const enrichedVideos = course.videos.map((v) => {
+              const enrichedVideos = videosWithCompletion.map((v) => {
                 const knownTitle = armyTitleMap.get(v.youtubeId);
                 const knownDuration = armyDurationMap.get(v.youtubeId);
                 const shouldUpdateTitle = knownTitle && (isGenericLectureTitle(v.title) || v.title.startsWith('Lecture '));
@@ -252,7 +275,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({
               });
               return { ...course, videos: enrichedVideos };
             }
-            return course;
+            return { ...course, videos: videosWithCompletion };
           });
         }
       }
@@ -490,7 +513,17 @@ export const AppProvider: React.FC<AppProviderProps> = ({
     resolvePlaylistTitles(activeCourse.videos, (updatedList) => {
       if (isMounted) {
         setCourses(prevCourses =>
-          prevCourses.map(c => (c.id === activeCourse.id ? { ...c, videos: updatedList } : c))
+          prevCourses.map(c => {
+            if (c.id !== activeCourse.id) return c;
+            const titleMap = new Map(updatedList.map(u => [u.id || u.youtubeId, u.title]));
+            const ytTitleMap = new Map(updatedList.map(u => [u.youtubeId, u.title]));
+            // ONLY update title, NEVER wipe out completed status!
+            const merged = c.videos.map(v => {
+              const newTitle = titleMap.get(v.id) || ytTitleMap.get(v.youtubeId);
+              return newTitle ? { ...v, title: newTitle } : v;
+            });
+            return { ...c, videos: merged };
+          })
         );
       }
     });
@@ -498,7 +531,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [activeCourse?.id, activeCourse?.videos]);
+  }, [activeCourse?.id]);
 
   // Save active course & video selection
   const setActiveCourseId = useCallback((id: string) => {
@@ -571,14 +604,16 @@ export const AppProvider: React.FC<AppProviderProps> = ({
   // Toggle Video Completion
   const toggleVideoCompletion = useCallback((courseId: string, videoId: string) => {
     setCourses(prev => {
+      let nextCompletedVal = false;
       const updated = prev.map(c => {
         if (c.id !== courseId) return c;
         const updatedVideos = c.videos.map(v => {
-          if (v.id !== videoId) return v;
+          if (v.id !== videoId && v.youtubeId !== videoId) return v;
           const nextCompleted = !v.completed;
+          nextCompletedVal = nextCompleted;
           if (nextCompleted) {
             recordDailyActivity(0);
-            const remaining = c.videos.filter(x => x.id !== videoId && !x.completed);
+            const remaining = c.videos.filter(x => x.id !== v.id && x.youtubeId !== v.youtubeId && !x.completed);
             if (remaining.length === 0) {
               soundManager.playSuccess();
               confetti({
@@ -598,9 +633,37 @@ export const AppProvider: React.FC<AppProviderProps> = ({
         }
         return updatedCourse;
       });
+
+      // Synchronously write to localStorage immediately!
+      try {
+        localStorage.setItem(STORAGE_KEYS.COURSES, JSON.stringify(updated));
+      } catch {}
+
+      // Update completed registry and persist immediately
+      const targetCourse = prev.find(c => c.id === courseId);
+      const targetVid = targetCourse?.videos.find(v => v.id === videoId || v.youtubeId === videoId);
+      const vidKey1 = `${courseId}::${targetVid?.id || videoId}`;
+      const vidKey2 = targetVid?.youtubeId ? `${courseId}::${targetVid.youtubeId}` : null;
+
+      setCompletedVideosRegistry(reg => {
+        const nextReg = { ...reg };
+        if (nextCompletedVal) {
+          nextReg[vidKey1] = true;
+          if (vidKey2) nextReg[vidKey2] = true;
+        } else {
+          delete nextReg[vidKey1];
+          if (vidKey2) delete nextReg[vidKey2];
+        }
+        completedVideosRef.current = nextReg;
+        try {
+          localStorage.setItem(STORAGE_KEYS.COMPLETED_VIDEOS, JSON.stringify(nextReg));
+        } catch {}
+        return nextReg;
+      });
+
       return updated;
     });
-  }, [userId]);
+  }, [userId, recordDailyActivity]);
 
   // Set Video Completed (idempotent, triggers celebrations on first-time completion)
   const setVideoCompleted = useCallback((courseId: string, videoId: string, completed: boolean) => {
@@ -608,7 +671,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({
       let isFirstTime = false;
       const updated = prev.map(c => {
         if (c.id !== courseId) return c;
-        const currentVid = c.videos.find(v => v.id === videoId);
+        const currentVid = c.videos.find(v => v.id === videoId || v.youtubeId === videoId);
         if (currentVid && currentVid.completed !== completed) {
           if (completed) isFirstTime = true;
         } else {
@@ -616,7 +679,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({
         }
 
         const updatedVideos = c.videos.map(v => {
-          if (v.id !== videoId) return v;
+          if (v.id !== videoId && v.youtubeId !== videoId) return v;
           return { ...v, completed };
         });
 
@@ -627,11 +690,16 @@ export const AppProvider: React.FC<AppProviderProps> = ({
         return updatedCourse;
       });
 
+      // Synchronously write to localStorage immediately!
+      try {
+        localStorage.setItem(STORAGE_KEYS.COURSES, JSON.stringify(updated));
+      } catch {}
+
       if (isFirstTime) {
         recordDailyActivity(0);
         soundManager.playCheck();
         const course = prev.find(c => c.id === courseId);
-        const remaining = course ? course.videos.filter(x => x.id !== videoId && !x.completed) : [];
+        const remaining = course ? course.videos.filter(x => x.id !== videoId && x.youtubeId !== videoId && !x.completed) : [];
         if (remaining.length === 0) {
           soundManager.playSuccess();
           confetti({
@@ -642,22 +710,72 @@ export const AppProvider: React.FC<AppProviderProps> = ({
         }
       }
 
+      // Update completed registry and persist immediately
+      const targetCourse = prev.find(c => c.id === courseId);
+      const targetVid = targetCourse?.videos.find(v => v.id === videoId || v.youtubeId === videoId);
+      const vidKey1 = `${courseId}::${targetVid?.id || videoId}`;
+      const vidKey2 = targetVid?.youtubeId ? `${courseId}::${targetVid.youtubeId}` : null;
+
+      setCompletedVideosRegistry(reg => {
+        const nextReg = { ...reg };
+        if (completed) {
+          nextReg[vidKey1] = true;
+          if (vidKey2) nextReg[vidKey2] = true;
+        } else {
+          delete nextReg[vidKey1];
+          if (vidKey2) delete nextReg[vidKey2];
+        }
+        completedVideosRef.current = nextReg;
+        try {
+          localStorage.setItem(STORAGE_KEYS.COMPLETED_VIDEOS, JSON.stringify(nextReg));
+        } catch {}
+        return nextReg;
+      });
+
       return updated;
     });
-  }, [userId]);
+  }, [userId, recordDailyActivity]);
 
   const markCourseCompleted = useCallback((courseId: string, completed: boolean) => {
-    setCourses(prev => prev.map(c => {
-      if (c.id !== courseId) return c;
-      const updated = {
-        ...c,
-        videos: c.videos.map(v => ({ ...v, completed }))
-      };
-      if (userId) {
-        upsertUserCourseToCloud(userId, updated);
-      }
+    setCourses(prev => {
+      const updated = prev.map(c => {
+        if (c.id !== courseId) return c;
+        const updatedVideos = c.videos.map(v => ({ ...v, completed }));
+        const updatedCourse = { ...c, videos: updatedVideos };
+        if (userId) {
+          upsertUserCourseToCloud(userId, updatedCourse);
+        }
+        return updatedCourse;
+      });
+
+      try {
+        localStorage.setItem(STORAGE_KEYS.COURSES, JSON.stringify(updated));
+      } catch {}
+
+      setCompletedVideosRegistry(reg => {
+        const nextReg = { ...reg };
+        const course = prev.find(c => c.id === courseId);
+        course?.videos.forEach(v => {
+          const k1 = `${courseId}::${v.id}`;
+          const k2 = v.youtubeId ? `${courseId}::${v.youtubeId}` : null;
+          if (completed) {
+            nextReg[k1] = true;
+            if (k2) nextReg[k2] = true;
+          } else {
+            delete nextReg[k1];
+            if (k2) delete nextReg[k2];
+          }
+        });
+        completedVideosRef.current = nextReg;
+        try {
+          localStorage.setItem(STORAGE_KEYS.COMPLETED_VIDEOS, JSON.stringify(nextReg));
+        } catch {}
+        return nextReg;
+      });
+
       return updated;
-    }));
+    });
+
     if (completed) {
       soundManager.playSuccess();
       confetti({ particleCount: 100, spread: 80, origin: { y: 0.5 } });
@@ -678,18 +796,54 @@ export const AppProvider: React.FC<AppProviderProps> = ({
 
   // Update course videos dynamically (e.g. when synced from YouTube playlist API)
   const updateCourseVideos = useCallback((courseId: string, updatedVideos: VideoItem[], updatedTitle?: string) => {
-    setCourses(prev => prev.map(c => {
-      if (c.id !== courseId) return c;
-      const updated = {
-        ...c,
-        title: updatedTitle || c.title,
-        videos: updatedVideos,
-      };
-      if (userId) {
-        upsertUserCourseToCloud(userId, updated);
-      }
+    setCourses(prev => {
+      const target = prev.find(c => c.id === courseId);
+      if (!target) return prev;
+
+      // PRESERVE completion states of existing videos!
+      const existingCompletionMap = new Map<string, boolean>();
+      target.videos.forEach(v => {
+        if (v.completed) {
+          existingCompletionMap.set(v.id, true);
+          if (v.youtubeId) existingCompletionMap.set(v.youtubeId, true);
+        }
+      });
+
+      const registry = completedVideosRef.current;
+
+      const mergedVideos = updatedVideos.map(uv => {
+        const isCompleted = uv.completed || 
+          existingCompletionMap.get(uv.id) || 
+          (uv.youtubeId ? existingCompletionMap.get(uv.youtubeId) : false) || 
+          registry[`${courseId}::${uv.id}`] ||
+          (uv.youtubeId ? registry[`${courseId}::${uv.youtubeId}`] : false) ||
+          false;
+
+        return {
+          ...uv,
+          completed: isCompleted
+        };
+      });
+
+      const updated = prev.map(c => {
+        if (c.id !== courseId) return c;
+        const upd = {
+          ...c,
+          title: updatedTitle || c.title,
+          videos: mergedVideos,
+        };
+        if (userId) {
+          upsertUserCourseToCloud(userId, upd);
+        }
+        return upd;
+      });
+
+      try {
+        localStorage.setItem(STORAGE_KEYS.COURSES, JSON.stringify(updated));
+      } catch {}
+
       return updated;
-    }));
+    });
   }, [userId]);
 
   // Update a single video's duration dynamically
