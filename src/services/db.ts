@@ -89,22 +89,24 @@ export async function fetchUserNotesFromCloud(userId: string): Promise<Record<st
   try {
     const { data, error } = await supabase
       .from('user_notes')
-      .select('course_id, video_id, title, content, color, is_pinned, updated_at')
+      .select('*')
       .eq('user_id', userId);
 
     if (error) {
-      console.warn('Supabase fetchUserNotes notice:', error.message);
+      // Graceful notice without breaking
+      console.warn('Supabase fetchUserNotes notice (using local storage):', error.message);
       return null;
     }
 
     const notesMap: Record<string, VideoNote> = {};
     if (data) {
-      data.forEach(row => {
-        // Use the same composite key as AppContext
-        const key = `${row.course_id}_${row.video_id}`;
+      data.forEach((row: any) => {
+        const courseId = row.course_id || 'general';
+        const videoId = row.video_id || row.id || 'default';
+        const key = `${courseId}_${videoId}`;
         notesMap[key] = {
-          videoId: row.video_id,
-          courseId: row.course_id,
+          videoId,
+          courseId,
           title: row.title || '',
           content: row.content || '',
           color: row.color || '#ffffff',

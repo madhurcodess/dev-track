@@ -1,19 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Header } from './components/Header';
-import { Sidebar } from './components/Sidebar';
 import { PlayerWorkspace } from './components/PlayerWorkspace';
-import { NotesEditor } from './components/NotesEditor';
+import { WorkspaceRightPanel } from './components/WorkspaceRightPanel';
 import { AddCourseModal } from './components/AddCourseModal';
 import { LandingPage } from './components/LandingPage';
 import { PlaylistsView } from './components/PlaylistsView';
 import { NotesView } from './components/NotesView';
-import { CompactTimerBar } from './components/CompactTimerBar';
 import { TimerCelebrationModal } from './components/TimerCelebrationModal';
-import { AdBanner } from './components/AdBanner';
+import { FloatingTimerWidget } from './components/FloatingTimerWidget';
 import { formatTime } from './utils/youtube';
 import { SignedIn, SignedOut, useUser } from '@clerk/clerk-react';
-import { Home, PanelLeft, PanelRight } from 'lucide-react';
+import { Home, ListVideo } from 'lucide-react';
 
 interface DashboardProps {
   onBackToLanding?: () => void;
@@ -23,10 +21,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onBackToLanding }) => {
   const {
     currentView,
     isTheaterMode,
-    isSidebarOpen,
-    setIsSidebarOpen,
-    isNotesOpen,
-    setIsNotesOpen,
+    isRightPanelOpen,
+    setIsRightPanelOpen,
+    workspaceRightTab,
+    setWorkspaceRightTab,
     isPomodoroRunning,
     startPomodoro,
     pausePomodoro,
@@ -71,16 +69,30 @@ const Dashboard: React.FC<DashboardProps> = ({ onBackToLanding }) => {
         return;
       }
 
-      // Alt + S: Toggle Sidebar
+      // Alt + S: Toggle Queue / Playlist
       if (!isInput && e.altKey && (e.key === 's' || e.key === 'S')) {
         e.preventDefault();
-        setIsSidebarOpen(!isSidebarOpen);
+        if (!isRightPanelOpen) {
+          setIsRightPanelOpen(true);
+          setWorkspaceRightTab('playlist');
+        } else if (workspaceRightTab === 'playlist') {
+          setIsRightPanelOpen(false);
+        } else {
+          setWorkspaceRightTab('playlist');
+        }
       }
 
       // Alt + N: Toggle Notes
       if (!isInput && e.altKey && (e.key === 'n' || e.key === 'N')) {
         e.preventDefault();
-        setIsNotesOpen(!isNotesOpen);
+        if (!isRightPanelOpen) {
+          setIsRightPanelOpen(true);
+          setWorkspaceRightTab('notes');
+        } else if (workspaceRightTab === 'notes') {
+          setIsRightPanelOpen(false);
+        } else {
+          setWorkspaceRightTab('notes');
+        }
       }
 
       // Alt + O: Toggle Pomodoro Dock
@@ -99,10 +111,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onBackToLanding }) => {
     isPomodoroRunning,
     startPomodoro,
     pausePomodoro,
-    isSidebarOpen,
-    setIsSidebarOpen,
-    isNotesOpen,
-    setIsNotesOpen,
+    isRightPanelOpen,
+    setIsRightPanelOpen,
+    workspaceRightTab,
+    setWorkspaceRightTab,
     isPomodoroExpanded,
     setIsPomodoroExpanded,
   ]);
@@ -119,53 +131,50 @@ const Dashboard: React.FC<DashboardProps> = ({ onBackToLanding }) => {
         <NotesView />
       ) : (
         <div className="flex-1 flex min-h-0 relative overflow-hidden">
-          {/* Re-open Left Sidebar Tab (when collapsed) */}
-          {!isTheaterMode && !isSidebarOpen && (
-            <button
-              onClick={() => setIsSidebarOpen(true)}
-              className="absolute left-3 top-3 z-30 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white hover:bg-slate-50 border-2 border-[#121417] shadow-solid text-[#121417] text-xs font-black transition-all hover:scale-105 active:scale-95"
-              title="Show Playlist Index"
-            >
-              <PanelLeft className="w-3.5 h-3.5 text-[#121417]" />
-              <span>Playlist</span>
-            </button>
-          )}
+          {/* Left Main Column: Video Player & Lecture Workspace */}
+          <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+            <PlayerWorkspace />
+          </div>
 
-          {/* Left Column: Tracklist & Course index */}
-          {!isTheaterMode && <Sidebar />}
-
-          {/* Center Workspace: Video Player & Controls */}
-          <PlayerWorkspace />
-
-          {/* Re-open Right Notes & Timer Tab (when collapsed) */}
-          {!isTheaterMode && !isNotesOpen && (
-            <button
-              onClick={() => setIsNotesOpen(true)}
-              className="absolute right-3 top-3 z-30 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#EBF755] hover:bg-[#E2EF43] border-2 border-[#121417] shadow-solid text-black text-xs font-black transition-all hover:scale-105 active:scale-95"
-              title="Show Notes & Timer"
-            >
-              <PanelRight className="w-3.5 h-3.5 text-black" />
-              <span>Notes & Timer</span>
-            </button>
-          )}
-
-          {/* Right Column: Timer container arranged directly above Contextual Notes area */}
-          {!isTheaterMode && isNotesOpen && (
-            <section className="w-full sm:w-[320px] md:w-[320px] lg:w-[320px] xl:w-[360px] 2xl:w-[420px] flex-shrink-0 h-full flex flex-col min-h-0 border-l border-[#121417]/10 bg-white">
-              {/* Rectangular Pomodoro Timer Container placed directly above notes */}
-              <CompactTimerBar />
-
-              {/* Single-Pane WYSIWYG Contextual Notes Editor */}
-              <NotesEditor />
-
-              {/* Rectangular Ad Container Below Notes Section */}
-              <div className="px-3 py-2 border-t border-[#121417]/10 bg-[#F9F8F5]/60 flex-shrink-0">
-                <AdBanner slotId="workspace-right-bottom-ad" format="sidebar" />
+          {/* Right Column: YouTube Playlist Queue & Notes with Pomodoro Timer */}
+          {!isTheaterMode && (
+            <>
+              {/* Desktop Side-by-Side Right Column - Expanded to match rectangular wireframe (~38%-40%) */}
+              <div className={`hidden lg:flex w-[400px] lg:w-[37%] xl:w-[38%] 2xl:w-[39%] min-w-[380px] max-w-[680px] flex-shrink-0 h-full flex-col min-h-0 pt-3 sm:pt-4 lg:pt-6 pb-6 pr-3 sm:pr-4 lg:pr-6 ${!isRightPanelOpen ? '!hidden' : ''}`}>
+                <WorkspaceRightPanel />
               </div>
-            </section>
+
+              {/* Tablet/Mobile Slide-in Drawer Overlay */}
+              {isRightPanelOpen && (
+                <div className="lg:hidden fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-xs animate-fade-in">
+                  <div 
+                    className="fixed inset-0"
+                    onClick={() => setIsRightPanelOpen(false)}
+                  />
+                  <div className="relative w-full sm:w-[400px] h-full bg-white shadow-2xl z-10 animate-slide-in-right flex flex-col">
+                    <WorkspaceRightPanel />
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Desktop Re-open Button when Right Panel is collapsed */}
+          {!isTheaterMode && !isRightPanelOpen && (
+            <button
+              onClick={() => setIsRightPanelOpen(true)}
+              className="hidden lg:flex absolute right-4 top-3 z-30 items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#EBF755] hover:bg-[#E2EF43] border-2 border-[#121417] shadow-solid text-black text-xs font-black transition-all hover:scale-105 active:scale-95"
+              title="Show Playlist & Notes"
+            >
+              <ListVideo className="w-3.5 h-3.5 text-black" />
+              <span>Queue & Notes</span>
+            </button>
           )}
         </div>
       )}
+
+      {/* Floating Draggable Focus Engine Widget */}
+      <FloatingTimerWidget />
 
       {/* Add Course / YouTube Playlist Modal */}
       <AddCourseModal />

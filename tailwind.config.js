@@ -60,7 +60,9 @@ export default {
       boxShadow: {
         'clean': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
         'clean-lg': '0 12px 30px -4px rgba(0, 0, 0, 0.08)',
+        'solid-xs': '2px 2px 0px 0px #121417',
         'solid': '3px 3px 0px 0px #121417',
+        'solid-md': '4px 4px 0px 0px #121417',
         'solid-lg': '5px 5px 0px 0px #121417',
         'solid-lime': '4px 4px 0px 0px #0D2319',
       },

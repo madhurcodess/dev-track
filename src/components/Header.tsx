@@ -6,15 +6,20 @@ import {
   Coffee,
   LayoutGrid,
   Tv,
-  FileText
+  FileText,
+  Timer
 } from 'lucide-react';
 import { AuthBar } from './AuthBar';
 import { BrandLogo } from './BrandLogo';
+import { formatTime } from '../utils/youtube';
 
 export const Header: React.FC = () => {
   const {
     activeCourse,
     pomodoroStats,
+    pomodoroTimeLeft,
+    isFloatingTimerOpen,
+    setIsFloatingTimerOpen,
     setIsAddModalOpen,
     hasClerkKey,
     currentView,
@@ -77,11 +82,22 @@ export const Header: React.FC = () => {
         </button>
       </nav>
 
-      {/* Right: Streak, Add Course, and Auth Profile */}
+      {/* Right: Timer, Streak, Add Course, and Auth Profile */}
       <div className="flex items-center gap-2 sm:gap-3">
+        {/* Focus Timer Button (To the left of Streak) */}
+        <button
+          onClick={() => setIsFloatingTimerOpen(!isFloatingTimerOpen)}
+          className="flex items-center gap-1.5 text-xs font-black px-3.5 py-1.5 rounded-full bg-[#EBF755] hover:bg-[#E2EF43] text-black border-2 border-[#121417] shadow-solid-xs transition-all hover:scale-105 active:scale-95"
+          title="Focus Timer"
+        >
+          <Timer className="w-3.5 h-3.5 text-black" />
+          <span className="hidden sm:inline font-black text-xs">Focus Timer</span>
+          <span className="font-mono text-[11px] font-extrabold bg-black/10 px-1.5 py-0.2 rounded-md">{formatTime(pomodoroTimeLeft)}</span>
+        </button>
+
         {/* Focus Streak Badge */}
         <div 
-          className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-white border border-[#121417]/15 text-[#121417] shadow-sm"
+          className="flex items-center gap-1.5 text-xs font-black px-3.5 py-1.5 rounded-full bg-white border-2 border-[#121417] text-[#121417] shadow-solid-xs"
           title={`${pomodoroStats.sessionsCompleted} focus sessions completed today`}
         >
           <Flame className="w-4 h-4 fill-current text-orange-500" />
@@ -91,7 +107,7 @@ export const Header: React.FC = () => {
         {/* Add Course Button */}
         <button
           onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center gap-1.5 text-xs font-bold px-3.5 sm:px-4 py-2 rounded-full bg-[#D4E4FC] hover:bg-[#C2DBFB] border border-[#121417]/15 text-[#121417] transition-all shadow-sm hover:scale-105"
+          className="flex items-center gap-1.5 text-xs font-black px-3.5 sm:px-4 py-1.5 rounded-full bg-[#D4E4FC] hover:bg-[#C2DBFB] border-2 border-[#121417] text-[#121417] transition-all shadow-solid-xs hover:scale-105 active:scale-95"
           title="Import YouTube Playlist or Video"
         >
           <Plus className="w-3.5 h-3.5" />
@@ -103,10 +119,10 @@ export const Header: React.FC = () => {
           href={import.meta.env.VITE_BUY_ME_COFFEE_URL || "https://buymeacoffee.com/madhurcodess"}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1.5 text-xs font-black px-3.5 py-2 rounded-full bg-[#FFF4D4] hover:bg-[#FFE8A3] border border-amber-300 text-amber-950 transition-all shadow-xs hover:scale-105 active:scale-95"
+          className="flex items-center gap-1.5 text-xs font-black px-3.5 py-1.5 rounded-full bg-[#FFF4D4] hover:bg-[#EBF755] border-2 border-[#121417] text-[#121417] transition-all shadow-solid-xs hover:scale-105 active:scale-95"
           title="Support the developer on Buy Me a Coffee!"
         >
-          <Coffee className="w-3.5 h-3.5 text-amber-800" />
+          <Coffee className="w-3.5 h-3.5 text-black" />
           <span className="hidden md:inline">Fuel The Dev ☕</span>
           <span className="md:hidden">☕</span>
         </a>

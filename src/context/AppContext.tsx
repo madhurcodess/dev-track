@@ -36,6 +36,7 @@ interface AppContextType {
   markCourseCompleted: (courseId: string, completed: boolean) => void;
   addCourse: (course: Course) => void;
   updateCourseVideos: (courseId: string, videos: VideoItem[], title?: string) => void;
+  updateVideoDuration: (courseId: string, videoId: string, duration: string) => void;
   deleteCourse: (courseId: string) => void;
   resetAllData: () => void;
 
@@ -88,6 +89,12 @@ interface AppContextType {
   setIsSidebarOpen: (open: boolean) => void;
   isNotesOpen: boolean;
   setIsNotesOpen: (open: boolean) => void;
+  workspaceRightTab: 'playlist' | 'notes';
+  setWorkspaceRightTab: (tab: 'playlist' | 'notes') => void;
+  isRightPanelOpen: boolean;
+  setIsRightPanelOpen: (open: boolean) => void;
+  isFloatingTimerOpen: boolean;
+  setIsFloatingTimerOpen: (open: boolean) => void;
   isTheaterMode: boolean;
   setIsTheaterMode: (theater: boolean) => void;
   isAddModalOpen: boolean;
@@ -160,13 +167,21 @@ export const AppProvider: React.FC<AppProviderProps> = ({
     return {};
   });
 
+  const playbackPositionsRef = useRef<Record<string, number>>(playbackPositions);
+  useEffect(() => {
+    playbackPositionsRef.current = playbackPositions;
+  }, [playbackPositions]);
+
   const savePlaybackPosition = useCallback((courseId: string, videoId: string, seconds: number) => {
     if (!courseId || !videoId || seconds < 0) return;
     const key = `${courseId}::${videoId}`;
+    const cur = playbackPositionsRef.current[key] || 0;
+    // Don't save if position change is minimal (< 2s)
+    if (Math.abs(cur - seconds) < 2) return;
+
     setPlaybackPositions(prev => {
-      // Don't save if position change is minimal (< 2s)
-      if (Math.abs((prev[key] || 0) - seconds) < 2) return prev;
       const updated = { ...prev, [key]: Math.floor(seconds) };
+      playbackPositionsRef.current = updated;
       try {
         localStorage.setItem(STORAGE_KEYS.PLAYBACK_POSITIONS, JSON.stringify(updated));
       } catch {}
@@ -177,8 +192,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({
   const getPlaybackPosition = useCallback((courseId: string, videoId: string): number => {
     if (!courseId || !videoId) return 0;
     const key = `${courseId}::${videoId}`;
-    return playbackPositions[key] || playbackPositions[videoId] || 0;
-  }, [playbackPositions]);
+    return playbackPositionsRef.current[key] || playbackPositionsRef.current[videoId] || 0;
+  }, []);
 
   const clearPlaybackPosition = useCallback((courseId: string, videoId: string) => {
     if (!courseId || !videoId) return;
@@ -187,6 +202,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({
       const updated = { ...prev };
       delete updated[key];
       delete updated[videoId];
+      playbackPositionsRef.current = updated;
       try {
         localStorage.setItem(STORAGE_KEYS.PLAYBACK_POSITIONS, JSON.stringify(updated));
       } catch {}
@@ -201,8 +217,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          // Immediately resolve any known Coder Army 57 course lectures or generic titles
-          const armyMap = new Map(CODER_ARMY_JAVA_57_VIDEOS.map(v => [v.youtubeId, v.title]));
+          // Immediately resolve any known Coder Army 57 course lectures or generic titles & real durations
+          const armyTitleMap = new Map(CODER_ARMY_JAVA_57_VIDEOS.map(v => [v.youtubeId, v.title]));
+          const armyDurationMap = new Map(CODER_ARMY_JAVA_57_VIDEOS.map(v => [v.youtubeId, v.duration]));
           return parsed.map((course: Course) => {
             const isCoderArmy = 
               course.playlistId === 'PLQEaRBV9gAFsR15tNo2QLF9d2qc-c018p' ||
@@ -210,11 +227,16 @@ export const AppProvider: React.FC<AppProviderProps> = ({
 
             if (isCoderArmy) {
               const enrichedVideos = course.videos.map((v) => {
-                const knownTitle = armyMap.get(v.youtubeId);
-                if (knownTitle && (isGenericLectureTitle(v.title) || v.title.startsWith('Lecture '))) {
-                  return { ...v, title: knownTitle };
-                }
-                return v;
+                const knownTitle = armyTitleMap.get(v.youtubeId);
+                const knownDuration = armyDurationMap.get(v.youtubeId);
+                const shouldUpdateTitle = knownTitle && (isGenericLectureTitle(v.title) || v.title.startsWith('Lecture '));
+                const shouldUpdateDuration = knownDuration && (!v.duration || v.duration === '20:00' || v.duration === '--:--');
+
+                return {
+                  ...v,
+                  title: shouldUpdateTitle ? knownTitle : v.title,
+                  duration: shouldUpdateDuration ? knownDuration : (v.duration || knownDuration || '20:00'),
+                };
               });
               return { ...course, videos: enrichedVideos };
             }
@@ -338,6 +360,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({
   // 5. UI Layout toggles
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [isNotesOpen, setIsNotesOpen] = useState<boolean>(true);
+  const [workspaceRightTab, setWorkspaceRightTab] = useState<'playlist' | 'notes'>('playlist');
+  const [isRightPanelOpen, setIsRightPanelOpen] = useState<boolean>(true);
+  const [isFloatingTimerOpen, setIsFloatingTimerOpen] = useState<boolean>(false);
   const [isTheaterMode, setIsTheaterMode] = useState<boolean>(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
 
@@ -605,6 +630,28 @@ export const AppProvider: React.FC<AppProviderProps> = ({
         title: updatedTitle || c.title,
         videos: updatedVideos,
       };
+      if (userId) {
+        upsertUserCourseToCloud(userId, updated);
+      }
+      return updated;
+    }));
+  }, [userId]);
+
+  // Update a single video's duration dynamically
+  const updateVideoDuration = useCallback((courseId: string, videoId: string, duration: string) => {
+    if (!courseId || !videoId || !duration) return;
+    setCourses(prev => prev.map(c => {
+      if (c.id !== courseId) return c;
+      let hasChanged = false;
+      const updatedVideos = c.videos.map(v => {
+        if (v.id === videoId && v.duration !== duration) {
+          hasChanged = true;
+          return { ...v, duration };
+        }
+        return v;
+      });
+      if (!hasChanged) return c;
+      const updated = { ...c, videos: updatedVideos };
       if (userId) {
         upsertUserCourseToCloud(userId, updated);
       }
@@ -920,6 +967,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({
         markCourseCompleted,
         addCourse,
         updateCourseVideos,
+        updateVideoDuration,
         deleteCourse,
         resetAllData,
         notes,
@@ -962,6 +1010,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({
         setIsSidebarOpen,
         isNotesOpen,
         setIsNotesOpen,
+        workspaceRightTab,
+        setWorkspaceRightTab,
+        isRightPanelOpen,
+        setIsRightPanelOpen,
+        isFloatingTimerOpen,
+        setIsFloatingTimerOpen,
         isTheaterMode,
         setIsTheaterMode,
         isAddModalOpen,
