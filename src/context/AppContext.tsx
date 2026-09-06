@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import type { Course, VideoItem, PomodoroMode, PomodoroSettings, PomodoroStats, VideoNote } from '../types';
+import type { Course, VideoItem, PomodoroMode, PomodoroSettings, PomodoroStats, VideoNote, NoteFolder } from '../types';
 import { soundManager } from '../utils/audio';
 import confetti from 'canvas-confetti';
 import debounce from 'lodash.debounce';
@@ -40,7 +40,16 @@ interface AppContextType {
   deleteCourse: (courseId: string) => void;
   resetAllData: () => void;
 
-  // Notes
+  // Notes & User Folders
+  folders: NoteFolder[];
+  activeFolderId: string;
+  setActiveFolderId: (id: string) => void;
+  createFolder: (name: string) => string;
+  renameFolder: (id: string, name: string) => void;
+  deleteFolder: (id: string) => void;
+  activeNoteKey: string;
+  setActiveNoteKey: (key: string) => void;
+  createNoteInFolder: (folderId?: string, title?: string) => string;
   notes: Record<string, VideoNote>;
   getNoteForCurrentVideo: () => VideoNote;
   saveNoteForCurrentVideo: (noteUpdate: Partial<VideoNote>) => void;
@@ -120,6 +129,9 @@ const STORAGE_KEYS = {
   ACTIVE_COURSE: 'devtrack_active_course_v2',
   ACTIVE_VIDEO: 'devtrack_active_video_v2',
   NOTES: 'devtrack_notes_v2',
+  FOLDERS: 'devtrack_user_folders_v3',
+  ACTIVE_FOLDER: 'devtrack_active_folder_v3',
+  ACTIVE_NOTE: 'devtrack_active_note_v3',
   POMODORO_SETTINGS: 'devtrack_pomo_settings_v2',
   POMODORO_STATS: 'devtrack_pomo_stats_v2',
   PLAYBACK_POSITIONS: 'devtrack_playback_pos_v2',
@@ -265,7 +277,25 @@ export const AppProvider: React.FC<AppProviderProps> = ({
 
   const activeVideo = activeCourse?.videos.find(v => v.id === activeVideoId) || activeCourse?.videos[0];
 
-  // 2. Notes State
+  // 2. User Folders & Notes State (User-created only)
+  const [folders, setFolders] = useState<NoteFolder[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.FOLDERS);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return [
+      { id: 'general', name: 'General Notes', createdAt: Date.now() }
+    ];
+  });
+
+  const [activeFolderId, setActiveFolderIdState] = useState<string>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.ACTIVE_FOLDER);
+    return saved || 'general';
+  });
+
   const [notes, setNotes] = useState<Record<string, VideoNote>>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.NOTES);
@@ -280,7 +310,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({
       general_default: {
         videoId: 'default',
         courseId: 'general',
-        title: 'General Quick Notes',
+        folderId: 'general',
+        title: 'Quick Note',
         content: '',
         color: '#ffffff',
         isPinned: false,
@@ -289,9 +320,33 @@ export const AppProvider: React.FC<AppProviderProps> = ({
     };
   });
 
+  const [activeNoteKey, setActiveNoteKeyState] = useState<string>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.ACTIVE_NOTE);
+    return saved || 'general_default';
+  });
+
   const [activeGeneralNoteKey, setActiveGeneralNoteKey] = useState<string>(() => {
     return 'general_default';
   });
+
+  // Sync folders & active pointers to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.FOLDERS, JSON.stringify(folders));
+    } catch {}
+  }, [folders]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.ACTIVE_FOLDER, activeFolderId);
+    } catch {}
+  }, [activeFolderId]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.ACTIVE_NOTE, activeNoteKey);
+    } catch {}
+  }, [activeNoteKey]);
 
   const [isNoteSaving, setIsNoteSaving] = useState<boolean>(false);
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
@@ -696,19 +751,62 @@ export const AppProvider: React.FC<AppProviderProps> = ({
     }
   }, []);
 
-  // Notes operations
-  const currentNoteKey = `${activeCourseId}_${activeVideo?.id || ''}`;
-  const getNoteForCurrentVideo = useCallback((): VideoNote => {
-    return notes[currentNoteKey] ?? {
-      videoId: activeVideo?.id || '',
-      courseId: activeCourseId,
-      title: activeVideo?.title || 'Untitled Note',
-      content: '',
-      color: '#ffffff',
-      isPinned: false,
-      updatedAt: Date.now()
+  // User Notes & Folder operations
+  const setActiveFolderId = useCallback((id: string) => {
+    setActiveFolderIdState(id);
+    // Find note in this folder
+    const notesInFolder = Object.entries(notes).filter(([_, n]) => (n.courseId === id || n.folderId === id));
+    if (notesInFolder.length > 0) {
+      setActiveNoteKeyState(notesInFolder[0][0]);
+    }
+  }, [notes]);
+
+  const setActiveNoteKey = useCallback((key: string) => {
+    setActiveNoteKeyState(key);
+    const target = notes[key];
+    if (target && (target.courseId || target.folderId)) {
+      setActiveFolderIdState(target.courseId || target.folderId || 'general');
+    }
+  }, [notes]);
+
+  const createFolder = useCallback((name: string): string => {
+    const trimmed = name.trim();
+    if (!trimmed) return 'general';
+    const newId = `folder_${Date.now()}`;
+    const newFolder: NoteFolder = {
+      id: newId,
+      name: trimmed,
+      createdAt: Date.now()
     };
-  }, [notes, currentNoteKey, activeVideo, activeCourseId]);
+    setFolders(prev => [...prev, newFolder]);
+    setActiveFolderIdState(newId);
+    return newId;
+  }, []);
+
+  const renameFolder = useCallback((id: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    setFolders(prev => prev.map(f => f.id === id ? { ...f, name: trimmed } : f));
+  }, []);
+
+  const deleteFolder = useCallback((id: string) => {
+    if (id === 'general') {
+      alert('General Notes folder cannot be deleted.');
+      return;
+    }
+    setFolders(prev => prev.filter(f => f.id !== id));
+    setNotes(prev => {
+      const next = { ...prev };
+      Object.keys(next).forEach(k => {
+        if (next[k].courseId === id || next[k].folderId === id) {
+          delete next[k];
+        }
+      });
+      return next;
+    });
+    setActiveFolderIdState('general');
+    setActiveNoteKeyState('general_default');
+  }, []);
 
   const debouncedSyncToCloud = useMemo(
     () =>
@@ -720,6 +818,44 @@ export const AppProvider: React.FC<AppProviderProps> = ({
       }, 800),
     []
   );
+
+  const createNoteInFolder = useCallback((folderId: string = 'general', title?: string): string => {
+    const vid = `note_${Date.now()}`;
+    const key = `${folderId}_${vid}`;
+    const newNote: VideoNote = {
+      videoId: vid,
+      courseId: folderId,
+      folderId: folderId,
+      title: title || 'Untitled Note',
+      content: '',
+      color: '#ffffff',
+      isPinned: false,
+      updatedAt: Date.now()
+    };
+    setNotes(prev => ({
+      ...prev,
+      [key]: newNote
+    }));
+    setActiveFolderIdState(folderId);
+    setActiveNoteKeyState(key);
+    if (userId) {
+      debouncedSyncToCloud(userId, newNote);
+    }
+    return key;
+  }, [userId, debouncedSyncToCloud]);
+
+  const getNoteForCurrentVideo = useCallback((): VideoNote => {
+    return notes[activeNoteKey] ?? {
+      videoId: 'default',
+      courseId: activeFolderId || 'general',
+      folderId: activeFolderId || 'general',
+      title: 'Quick Note',
+      content: '',
+      color: '#ffffff',
+      isPinned: false,
+      updatedAt: Date.now()
+    };
+  }, [notes, activeNoteKey, activeFolderId]);
 
   const saveNote = useCallback((key: string, noteUpdate: Partial<VideoNote>) => {
     setIsNoteSaving(true);
@@ -757,13 +893,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({
   }, [userId, debouncedSyncToCloud]);
 
   const saveNoteForCurrentVideo = useCallback((noteUpdate: Partial<VideoNote>) => {
-    if (!activeVideo || !activeCourseId) return;
-    saveNote(currentNoteKey, {
-      courseId: activeCourseId,
-      videoId: activeVideo.id,
-      ...noteUpdate
-    });
-  }, [activeVideo, activeCourseId, currentNoteKey, saveNote]);
+    saveNote(activeNoteKey, noteUpdate);
+  }, [activeNoteKey, saveNote]);
 
   const deleteNote = useCallback((key: string) => {
     setNotes(prev => {
@@ -970,6 +1101,15 @@ export const AppProvider: React.FC<AppProviderProps> = ({
         updateVideoDuration,
         deleteCourse,
         resetAllData,
+        folders,
+        activeFolderId,
+        setActiveFolderId,
+        createFolder,
+        renameFolder,
+        deleteFolder,
+        activeNoteKey,
+        setActiveNoteKey,
+        createNoteInFolder,
         notes,
         getNoteForCurrentVideo,
         saveNoteForCurrentVideo,

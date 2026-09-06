@@ -32,9 +32,16 @@ export interface PomodoroStats {
   lastActiveDate: string; // YYYY-MM-DD
 }
 
+export interface NoteFolder {
+  id: string;
+  name: string;
+  createdAt: number;
+}
+
 export interface VideoNote {
-  videoId: string;
-  courseId: string;
+  videoId: string; // unique note id
+  courseId: string; // folder ID (e.g. 'general', 'folder_xxx')
+  folderId?: string;
   title: string;
   content: string;
   color: string;

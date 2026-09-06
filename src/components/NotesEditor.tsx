@@ -1,11 +1,11 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { formatTime } from '../utils/youtube';
 import type { VideoNote } from '../types';
 import { 
   Bold, Italic, Strikethrough, List, ListTodo, 
-  Pin, Palette, Edit3, Clock, Check, Copy, ChevronDown,
-  Type, X, Tv, FileText, Plus
+  Pin, Palette, Clock, Check, Copy, ChevronDown,
+  Type, X, Plus, Folder, FileText, Trash2, FolderPlus
 } from 'lucide-react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -59,24 +59,26 @@ export interface NotesEditorProps {
   noteKey?: string;
   onClose?: () => void;
   fullWidth?: boolean;
+  showFolderSelector?: boolean;
 }
 
 export const NotesEditor: React.FC<NotesEditorProps> = ({ 
   noteKey, 
   onClose,
-  fullWidth = false 
+  fullWidth = false,
+  showFolderSelector = true
 }) => {
   const {
-    activeVideo,
-    activeCourse,
-    activeCourseId,
-    getNoteForCurrentVideo,
-    saveNoteForCurrentVideo,
+    folders,
+    activeFolderId,
+    setActiveFolderId,
+    createFolder,
+    activeNoteKey,
+    setActiveNoteKey,
+    createNoteInFolder,
     notes,
     saveNote,
-    createGeneralNote,
-    activeGeneralNoteKey,
-    setActiveGeneralNoteKey,
+    deleteNote,
     isNoteSaving,
     lastSavedTime,
     getCurrentPlayerTime,
@@ -84,60 +86,52 @@ export const NotesEditor: React.FC<NotesEditorProps> = ({
     isNotesOpen,
   } = useApp();
 
-  const [workspaceTab, setWorkspaceTab] = useState<'lecture' | 'general'>('lecture');
   const [copied, setCopied] = useState(false);
   const [isSizeDropdownOpen, setIsSizeDropdownOpen] = useState(false);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
-  const [isGeneralDropdownOpen, setIsGeneralDropdownOpen] = useState(false);
-
-  // List all general notes
-  const generalNotesList = Object.entries(notes)
-    .filter(([_, n]) => n.courseId === 'general' || (!n.courseId && n.videoId?.startsWith('note_')) || _ === 'general_default')
-    .map(([key, n]) => ({ key, note: n }))
-    .sort((a, b) => b.note.updatedAt - a.note.updatedAt);
+  const [isFolderDropdownOpen, setIsFolderDropdownOpen] = useState(false);
+  const [isNoteDropdownOpen, setIsNoteDropdownOpen] = useState(false);
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
 
   // Determine mode and target note
   const isDirectKeyMode = Boolean(noteKey);
-  
-  // If in direct key mode (modal), use noteKey
-  // Otherwise in workspace, respect the selected tab (lecture vs general)
-  const targetKey = isDirectKeyMode 
-    ? noteKey! 
-    : workspaceTab === 'lecture'
-    ? `${activeCourseId}_${activeVideo?.id || ''}`
-    : activeGeneralNoteKey;
+  const targetKey = isDirectKeyMode ? noteKey! : activeNoteKey;
 
-  const note: VideoNote = isDirectKeyMode
-    ? (notes[targetKey] ?? {
-        videoId: '',
-        courseId: '',
-        title: 'Untitled Note',
-        content: '',
-        color: '#ffffff',
-        isPinned: false,
-        updatedAt: Date.now(),
-      })
-    : workspaceTab === 'lecture'
-    ? getNoteForCurrentVideo()
-    : (notes[activeGeneralNoteKey] ?? {
-        videoId: 'default',
-        courseId: 'general',
-        title: 'General Quick Notes',
-        content: '',
-        color: '#ffffff',
-        isPinned: false,
-        updatedAt: Date.now(),
-      });
+  // Active folder object
+  const currentFolder = useMemo(() => {
+    return folders.find(f => f.id === activeFolderId) || folders[0] || { id: 'general', name: 'General Notes', createdAt: 0 };
+  }, [folders, activeFolderId]);
+
+  // Notes in the active folder
+  const notesInCurrentFolder = useMemo(() => {
+    return Object.entries(notes)
+      .filter(([_, n]) => (n.folderId === activeFolderId || n.courseId === activeFolderId || (!n.folderId && !n.courseId && activeFolderId === 'general')))
+      .map(([key, note]) => ({ key, note }))
+      .sort((a, b) => (b.note.updatedAt || 0) - (a.note.updatedAt || 0));
+  }, [notes, activeFolderId]);
+
+  // Current note data
+  const note: VideoNote = useMemo(() => {
+    return notes[targetKey] ?? {
+      videoId: 'default',
+      courseId: activeFolderId || 'general',
+      folderId: activeFolderId || 'general',
+      title: 'Quick Note',
+      content: '',
+      color: '#ffffff',
+      isPinned: false,
+      updatedAt: Date.now(),
+    };
+  }, [notes, targetKey, activeFolderId]);
 
   const handleUpdate = useCallback((updates: Partial<VideoNote>) => {
-    if (isDirectKeyMode) {
-      saveNote(targetKey, updates);
-    } else if (workspaceTab === 'lecture') {
-      saveNoteForCurrentVideo(updates);
-    } else {
-      saveNote(activeGeneralNoteKey, { courseId: 'general', ...updates });
-    }
-  }, [isDirectKeyMode, targetKey, workspaceTab, activeGeneralNoteKey, saveNote, saveNoteForCurrentVideo]);
+    saveNote(targetKey, {
+      ...updates,
+      folderId: note.folderId || activeFolderId || 'general',
+      courseId: note.courseId || activeFolderId || 'general',
+    });
+  }, [targetKey, note.folderId, note.courseId, activeFolderId, saveNote]);
 
   const editor = useEditor({
     extensions: [
@@ -152,7 +146,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = ({
       }),
       TimestampNode,
     ],
-    content: note.content,
+    content: note.content || '',
     editorProps: {
       attributes: {
         class: 'prose prose-sm max-w-none focus:outline-none min-h-[160px] text-xs sm:text-sm text-[#121417] leading-relaxed',
@@ -176,11 +170,11 @@ export const NotesEditor: React.FC<NotesEditorProps> = ({
     },
   });
 
-  // Re-sync editor content when note changes externally or switching notes/videos/tabs
+  // Re-sync editor content when switching active note or if updated externally
   useEffect(() => {
     if (editor && editor.getHTML() !== note.content) {
       const currentPos = editor.state.selection.$anchor.pos;
-      editor.commands.setContent(note.content, { emitUpdate: false });
+      editor.commands.setContent(note.content || '', { emitUpdate: false });
       if (currentPos <= editor.state.doc.content.size) {
         editor.commands.setTextSelection(currentPos);
       }
@@ -211,6 +205,18 @@ export const NotesEditor: React.FC<NotesEditorProps> = ({
     }).insertContent(' ').run();
   }, [editor, getCurrentPlayerTime]);
 
+  // Keyboard shortcut: Alt + T to insert timestamp anywhere while typing
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey && (e.key === 't' || e.key === 'T')) {
+        e.preventDefault();
+        handleInsertTimestamp();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleInsertTimestamp]);
+
   const copyNotes = async () => {
     if (!editor) return;
     try {
@@ -218,6 +224,29 @@ export const NotesEditor: React.FC<NotesEditorProps> = ({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {}
+  };
+
+  const handleCreateFolderSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFolderName.trim()) return;
+    const newId = createFolder(newFolderName.trim());
+    createNoteInFolder(newId, 'New Note');
+    setNewFolderName('');
+    setIsCreatingFolder(false);
+    setIsFolderDropdownOpen(false);
+  };
+
+  const handleDeleteCurrentNote = () => {
+    if (window.confirm(`Delete note "${note.title || 'Untitled'}"?`)) {
+      deleteNote(targetKey);
+      // Auto switch to another note in folder if available
+      const remaining = notesInCurrentFolder.filter(n => n.key !== targetKey);
+      if (remaining.length > 0) {
+        setActiveNoteKey(remaining[0].key);
+      } else {
+        createNoteInFolder(activeFolderId, 'Quick Note');
+      }
+    }
   };
 
   // If in workspace drawer mode and notes are toggled off
@@ -232,11 +261,6 @@ export const NotesEditor: React.FC<NotesEditorProps> = ({
     return 'Normal Text';
   };
 
-  // Active lecture index
-  const activeLectureIndex = activeCourse && activeVideo
-    ? activeCourse.videos.findIndex(v => v.id === activeVideo.id) + 1
-    : 1;
-
   return (
     <div 
       className={`flex-1 flex flex-col min-h-0 transition-colors duration-200 ${
@@ -244,361 +268,432 @@ export const NotesEditor: React.FC<NotesEditorProps> = ({
       }`}
       style={{ backgroundColor: note.color || '#ffffff' }}
     >
-      {/* Workspace Note Mode Tabs: Lecture Note vs General Notes */}
-      {!isDirectKeyMode && (
-        <div className="flex items-center border-b border-[#121417]/10 bg-[#F9F8F5]">
-          <button
-            onClick={() => setWorkspaceTab('lecture')}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-black transition-all border-b-2 ${
-              workspaceTab === 'lecture'
-                ? 'border-[#121417] text-[#121417] bg-white shadow-2xs'
-                : 'border-transparent text-[#121417]/60 hover:text-[#121417] hover:bg-black/5'
-            }`}
-          >
-            <Tv className="w-3.5 h-3.5" />
-            <span className="truncate">Playlist / Lecture Note</span>
-          </button>
-
-          <button
-            onClick={() => setWorkspaceTab('general')}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-black transition-all border-b-2 ${
-              workspaceTab === 'general'
-                ? 'border-[#121417] text-[#121417] bg-white shadow-2xs'
-                : 'border-transparent text-[#121417]/60 hover:text-[#121417] hover:bg-black/5'
-            }`}
-          >
-            <FileText className="w-3.5 h-3.5" />
-            <span className="truncate">General Notes</span>
-          </button>
-        </div>
-      )}
-
-      {/* General Notes Selector Bar (when on General tab in Workspace) */}
-      {!isDirectKeyMode && workspaceTab === 'general' && (
-        <div className="px-3 py-1.5 bg-black/[0.03] border-b border-black/5 flex items-center justify-between gap-2">
-          <div className="relative flex-1">
-            <button
-              onClick={() => setIsGeneralDropdownOpen(!isGeneralDropdownOpen)}
-              className="w-full flex items-center justify-between px-2.5 py-1 bg-white rounded-lg border border-black/10 text-xs font-bold text-[#121417] text-left hover:bg-black/5 transition-colors"
-            >
-              <span className="truncate">{note.title || 'General Note'}</span>
-              <ChevronDown className="w-3 h-3 text-[#121417]/50 ml-1 flex-shrink-0" />
-            </button>
-
-            {isGeneralDropdownOpen && (
-              <div className="absolute left-0 right-0 top-full mt-1 bg-white border-2 border-[#121417] rounded-xl shadow-solid-lg z-30 py-1 max-h-48 overflow-y-auto animate-fade-in">
-                <div className="px-2.5 py-1 text-[10px] font-black uppercase text-[#121417]/40">
-                  Switch General Note
-                </div>
-                {generalNotesList.map(item => (
-                  <button
-                    key={item.key}
-                    onClick={() => {
-                      setActiveGeneralNoteKey(item.key);
-                      setIsGeneralDropdownOpen(false);
-                    }}
-                    className={`w-full px-2.5 py-1.5 text-left text-xs transition-colors flex items-center justify-between ${
-                      item.key === activeGeneralNoteKey
-                        ? 'bg-[#EBF755] font-black text-black'
-                        : 'hover:bg-black/5 text-[#121417]'
-                    }`}
-                  >
-                    <span className="truncate">{item.note.title || 'Untitled'}</span>
-                    {item.note.isPinned && <Pin className="w-2.5 h-2.5 fill-current ml-1" />}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <button
-            onClick={() => {
-              createGeneralNote();
-              setIsGeneralDropdownOpen(false);
-            }}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-black bg-[#EBF755] hover:bg-[#E2EF43] text-black border border-[#121417]/20 transition-all flex-shrink-0"
-            title="Create new general note"
-          >
-            <Plus className="w-3 h-3" />
-            <span>New</span>
-          </button>
-        </div>
-      )}
-
-      {/* If on lecture tab in workspace but no video selected */}
-      {!isDirectKeyMode && workspaceTab === 'lecture' && !activeVideo ? (
-        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white">
-          <div className="w-12 h-12 rounded-2xl bg-[#D4E4FC] border-2 border-[#121417] text-[#121417] flex items-center justify-center mb-3 shadow-solid">
-            <Edit3 className="w-6 h-6" />
-          </div>
-          <h3 className="text-sm font-extrabold text-[#121417] mb-1">Lecture Notes</h3>
-          <p className="text-xs text-[#121417]/60 max-w-[200px] leading-relaxed">
-            Select a lecture from the playlist index on the left to start taking lecture notes.
-          </p>
-        </div>
-      ) : (
-        <>
-          {/* Top Bar: Title, Context info, Pin, and Close (if modal) */}
-          <div className="p-3 sm:p-4 pb-2 flex flex-col gap-1 border-b border-black/5">
-            {/* Context Badge (if lecture note) */}
-            {!isDirectKeyMode && workspaceTab === 'lecture' && activeVideo && (
-              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-[#121417]/60">
-                <span className="bg-black/10 px-2 py-0.5 rounded-full text-[#121417]">
-                  Lecture {activeLectureIndex} of {activeCourse?.videos.length}
-                </span>
-                <span className="truncate max-w-[180px]">{activeCourse?.title}</span>
-              </div>
-            )}
-
-            <div className="flex items-center justify-between gap-3">
-              <input 
-                type="text" 
-                value={note.title} 
-                onChange={handleTitleChange} 
-                placeholder={workspaceTab === 'lecture' ? 'Lecture Note Title...' : 'General Note Title...'}
-                className="flex-1 font-black text-sm sm:text-base bg-transparent border-none outline-none placeholder-[#121417]/40 text-[#121417]"
-              />
-              <div className="flex items-center gap-1.5">
-                <button 
-                  onClick={togglePin}
-                  className={`p-1.5 rounded-full transition-all ${
-                    note.isPinned 
-                      ? 'bg-[#121417] text-[#EBF755] shadow-xs scale-105' 
-                      : 'text-[#121417]/50 hover:bg-black/5 hover:text-[#121417]'
-                  }`}
-                  title={note.isPinned ? 'Unpin Note' : 'Pin Note'}
-                >
-                  <Pin className={`w-4 h-4 ${note.isPinned ? 'fill-current' : ''}`} />
-                </button>
-
-                {onClose && (
-                  <button
-                    onClick={onClose}
-                    className="p-1.5 rounded-full text-[#121417]/50 hover:bg-black/10 hover:text-[#121417] transition-colors"
-                    title="Close Note"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Formatting Toolbar */}
-          <div className="px-3 sm:px-4 py-1.5 flex items-center justify-between gap-1.5 flex-wrap border-b border-black/5 bg-black/[0.02]">
-            <div className="flex items-center gap-1 flex-wrap">
-              {/* Timestamp Button */}
+      {/* 1. Workspace Folder & Note Pickers Header (When rendered in workspace or standalone) */}
+      {!isDirectKeyMode && showFolderSelector && (
+        <div className="px-3 py-2 bg-[#F9F8F5] border-b-2 border-[#121417]/10 flex flex-col gap-2">
+          {/* Row 1: Folder Selector + "+ New Note" Button */}
+          <div className="flex items-center justify-between gap-2">
+            {/* Folder Dropdown */}
+            <div className="relative flex-1">
               <button
-                onClick={handleInsertTimestamp}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-[#EBF755] hover:bg-[#E2EF43] text-black shadow-xs transition-transform active:scale-95"
-                title="Insert current video timestamp"
+                type="button"
+                onClick={() => {
+                  setIsFolderDropdownOpen(!isFolderDropdownOpen);
+                  setIsNoteDropdownOpen(false);
+                }}
+                className="w-full flex items-center justify-between gap-1.5 px-2.5 py-1.5 bg-white rounded-xl border-2 border-[#121417] shadow-solid-2xs text-xs font-black text-[#121417] hover:bg-[#EBF755]/20 transition-all text-left"
+                title="Select folder"
               >
-                <Clock className="w-3 h-3" />
-                <span>Time</span>
+                <div className="flex items-center gap-1.5 truncate">
+                  <Folder className="w-3.5 h-3.5 text-[#121417] flex-shrink-0" />
+                  <span className="truncate">{currentFolder.name}</span>
+                </div>
+                <ChevronDown className={`w-3.5 h-3.5 text-[#121417]/60 transition-transform ${isFolderDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
-              
-              <div className="w-[1px] h-3.5 bg-[#121417]/15 mx-0.5" />
 
-              {editor && (
-                <>
-                  {/* Text Size Selector Dropdown */}
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setIsSizeDropdownOpen(!isSizeDropdownOpen)}
-                      className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold text-[#121417]/80 hover:bg-black/10 transition-colors border border-black/10 bg-white/70 shadow-2xs"
-                      title="Text Size"
-                    >
-                      <Type className="w-3 h-3 text-[#121417]/70" />
-                      <span>{getCurrentTextSizeLabel()}</span>
-                      <ChevronDown className="w-3 h-3 text-[#121417]/50" />
-                    </button>
+              {/* Folder Selector Dropdown Menu */}
+              {isFolderDropdownOpen && (
+                <div className="absolute left-0 top-full mt-1 w-56 bg-white border-2 border-[#121417] rounded-xl shadow-solid-lg z-40 py-1 max-h-56 overflow-y-auto animate-fade-in">
+                  <div className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-[#121417]/50 border-b border-black/5">
+                    SELECT FOLDER
+                  </div>
+                  {folders.map(f => {
+                    const count = Object.values(notes).filter(n => n.folderId === f.id || n.courseId === f.id).length;
+                    const isSelected = f.id === activeFolderId;
+                    return (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveFolderId(f.id);
+                          setIsFolderDropdownOpen(false);
+                        }}
+                        className={`w-full px-2.5 py-1.5 text-left text-xs font-bold transition-colors flex items-center justify-between ${
+                          isSelected ? 'bg-[#EBF755] text-black font-black' : 'hover:bg-black/5 text-[#121417]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 truncate">
+                          <Folder className="w-3 h-3 flex-shrink-0" />
+                          <span className="truncate">{f.name}</span>
+                        </div>
+                        <span className="text-[10px] opacity-60 font-mono">({count})</span>
+                      </button>
+                    );
+                  })}
 
-                    {isSizeDropdownOpen && (
-                      <div className="absolute left-0 top-full mt-1 bg-white border-2 border-[#121417] rounded-xl shadow-solid py-1 z-30 min-w-[130px] animate-fade-in">
+                  {/* Create New Folder Inline or Trigger */}
+                  <div className="p-1.5 border-t border-black/10 mt-1">
+                    {isCreatingFolder ? (
+                      <form onSubmit={handleCreateFolderSubmit} className="flex items-center gap-1">
+                        <input
+                          type="text"
+                          value={newFolderName}
+                          onChange={(e) => setNewFolderName(e.target.value)}
+                          placeholder="Folder name..."
+                          autoFocus
+                          className="flex-1 px-2 py-1 text-xs border border-[#121417] rounded-lg outline-none font-bold"
+                        />
                         <button
-                          onClick={() => {
-                            editor.chain().focus().setParagraph().run();
-                            setIsSizeDropdownOpen(false);
-                          }}
-                          className={`w-full px-3 py-1.5 text-left text-xs font-medium hover:bg-[#EBF755] transition-colors ${
-                            !editor.isActive('heading') ? 'font-black bg-[#EBF755]/50 text-black' : 'text-[#121417]'
-                          }`}
+                          type="submit"
+                          className="p-1 rounded-lg bg-[#EBF755] border border-[#121417] text-black font-black text-xs"
+                          title="Save Folder"
                         >
-                          Normal Text
+                          <Check className="w-3.5 h-3.5" />
                         </button>
                         <button
-                          onClick={() => {
-                            editor.chain().focus().toggleHeading({ level: 1 }).run();
-                            setIsSizeDropdownOpen(false);
-                          }}
-                          className={`w-full px-3 py-1.5 text-left text-sm font-black hover:bg-[#EBF755] transition-colors ${
-                            editor.isActive('heading', { level: 1 }) ? 'bg-[#EBF755]/50 text-black' : 'text-[#121417]'
-                          }`}
+                          type="button"
+                          onClick={() => setIsCreatingFolder(false)}
+                          className="p-1 rounded-lg hover:bg-black/5 text-slate-500"
                         >
-                          Large (H1)
+                          <X className="w-3.5 h-3.5" />
                         </button>
-                        <button
-                          onClick={() => {
-                            editor.chain().focus().toggleHeading({ level: 2 }).run();
-                            setIsSizeDropdownOpen(false);
-                          }}
-                          className={`w-full px-3 py-1.5 text-left text-xs font-bold hover:bg-[#EBF755] transition-colors ${
-                            editor.isActive('heading', { level: 2 }) ? 'bg-[#EBF755]/50 text-black' : 'text-[#121417]'
-                          }`}
-                        >
-                          Medium (H2)
-                        </button>
-                        <button
-                          onClick={() => {
-                            editor.chain().focus().toggleHeading({ level: 3 }).run();
-                            setIsSizeDropdownOpen(false);
-                          }}
-                          className={`w-full px-3 py-1.5 text-left text-[11px] font-bold hover:bg-[#EBF755] transition-colors ${
-                            editor.isActive('heading', { level: 3 }) ? 'bg-[#EBF755]/50 text-black' : 'text-[#121417]'
-                          }`}
-                        >
-                          Small (H3)
-                        </button>
-                      </div>
+                      </form>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setIsCreatingFolder(true)}
+                        className="w-full flex items-center justify-center gap-1 py-1 px-2 rounded-lg text-xs font-black bg-[#EBF755] hover:bg-[#E2EF43] text-black border border-[#121417]/30 transition-colors"
+                      >
+                        <FolderPlus className="w-3.5 h-3.5" />
+                        <span>+ New Folder</span>
+                      </button>
                     )}
                   </div>
-
-                  {/* Bold */}
-                  <button
-                    onClick={() => editor.chain().focus().toggleBold().run()}
-                    className={`p-1.5 rounded-lg text-[#121417]/80 hover:bg-black/10 transition-colors ${
-                      editor.isActive('bold') ? 'bg-[#121417] text-[#EBF755] shadow-2xs font-bold' : ''
-                    }`}
-                    title="Bold (Ctrl+B)"
-                  >
-                    <Bold className="w-3.5 h-3.5" />
-                  </button>
-
-                  {/* Italic */}
-                  <button
-                    onClick={() => editor.chain().focus().toggleItalic().run()}
-                    className={`p-1.5 rounded-lg text-[#121417]/80 hover:bg-black/10 transition-colors ${
-                      editor.isActive('italic') ? 'bg-[#121417] text-[#EBF755] shadow-2xs font-bold' : ''
-                    }`}
-                    title="Italic (Ctrl+I)"
-                  >
-                    <Italic className="w-3.5 h-3.5" />
-                  </button>
-
-                  {/* Strikethrough */}
-                  <button
-                    onClick={() => editor.chain().focus().toggleStrike().run()}
-                    className={`p-1.5 rounded-lg text-[#121417]/80 hover:bg-black/10 transition-colors ${
-                      editor.isActive('strike') ? 'bg-[#121417] text-[#EBF755] shadow-2xs font-bold' : ''
-                    }`}
-                    title="Strikethrough"
-                  >
-                    <Strikethrough className="w-3.5 h-3.5" />
-                  </button>
-
-                  <div className="w-[1px] h-3.5 bg-[#121417]/15 mx-0.5" />
-
-                  {/* Bullet Points */}
-                  <button
-                    onClick={() => editor.chain().focus().toggleBulletList().run()}
-                    className={`p-1.5 rounded-lg text-[#121417]/80 hover:bg-black/10 transition-colors ${
-                      editor.isActive('bulletList') ? 'bg-[#121417] text-[#EBF755] shadow-2xs font-bold' : ''
-                    }`}
-                    title="Bullet Points"
-                  >
-                    <List className="w-3.5 h-3.5" />
-                  </button>
-
-                  {/* Interactive Checkboxes / Task List */}
-                  <button
-                    onClick={() => editor.chain().focus().toggleTaskList().run()}
-                    className={`p-1.5 rounded-lg text-[#121417]/80 hover:bg-black/10 transition-colors ${
-                      editor.isActive('taskList') ? 'bg-[#121417] text-[#EBF755] shadow-2xs font-bold' : ''
-                    }`}
-                    title="Checklist / Tasks"
-                  >
-                    <ListTodo className="w-3.5 h-3.5" />
-                  </button>
-                </>
+                </div>
               )}
             </div>
-            
-            {/* Background Color Palette Picker */}
+
+            {/* "+ New Note" Action Button */}
+            <button
+              type="button"
+              onClick={() => {
+                createNoteInFolder(activeFolderId, 'New Note');
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black bg-[#EBF755] hover:bg-[#E2EF43] text-black border-2 border-[#121417] shadow-solid-2xs transition-all active:scale-95 flex-shrink-0"
+              title="Create a new note in current folder"
+            >
+              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span>New Note</span>
+            </button>
+          </div>
+
+          {/* Row 2: Note File Selector (Dropdown if multiple notes in folder) */}
+          {notesInCurrentFolder.length > 0 && (
             <div className="relative">
-              <button 
+              <button
                 type="button"
-                onClick={() => setIsPaletteOpen(!isPaletteOpen)}
-                className="p-1.5 rounded-lg text-[#121417]/60 hover:bg-black/10 hover:text-[#121417] transition-colors"
-                title="Note Background Color"
+                onClick={() => {
+                  setIsNoteDropdownOpen(!isNoteDropdownOpen);
+                  setIsFolderDropdownOpen(false);
+                }}
+                className="w-full flex items-center justify-between gap-1.5 px-2.5 py-1 bg-white/80 rounded-lg border border-black/10 hover:bg-white text-xs text-[#121417] transition-all text-left"
               >
-                <Palette className="w-3.5 h-3.5" />
+                <div className="flex items-center gap-1.5 truncate">
+                  <FileText className="w-3 h-3 text-[#121417]/60 flex-shrink-0" />
+                  <span className="font-bold truncate text-[#121417]">
+                    {note.title || 'Untitled Note'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <span className="text-[10px] text-[#121417]/50 font-mono">
+                    {notesInCurrentFolder.length} {notesInCurrentFolder.length === 1 ? 'file' : 'files'}
+                  </span>
+                  <ChevronDown className={`w-3 h-3 text-[#121417]/50 transition-transform ${isNoteDropdownOpen ? 'rotate-180' : ''}`} />
+                </div>
               </button>
 
-              {isPaletteOpen && (
-                <div className="absolute right-0 top-full mt-1 flex flex-wrap gap-1.5 bg-white p-2 rounded-2xl shadow-solid-lg border-2 border-[#121417] z-40 w-44 animate-fade-in">
-                  {PRESET_NOTE_COLORS.map(c => (
+              {/* Notes in folder dropdown */}
+              {isNoteDropdownOpen && (
+                <div className="absolute left-0 right-0 top-full mt-1 bg-white border-2 border-[#121417] rounded-xl shadow-solid-lg z-30 py-1 max-h-48 overflow-y-auto animate-fade-in">
+                  <div className="px-2.5 py-1 text-[10px] font-black uppercase text-[#121417]/40 border-b border-black/5">
+                    Notes in {currentFolder.name}
+                  </div>
+                  {notesInCurrentFolder.map(item => (
                     <button
-                      key={c.hex}
-                      onClick={() => changeColor(c.hex)}
-                      className={`w-6 h-6 rounded-full border-2 border-black/20 hover:scale-110 transition-transform ${
-                        (note.color || '#ffffff') === c.hex ? 'ring-2 ring-[#121417] scale-105' : ''
+                      key={item.key}
+                      type="button"
+                      onClick={() => {
+                        setActiveNoteKey(item.key);
+                        setIsNoteDropdownOpen(false);
+                      }}
+                      className={`w-full px-2.5 py-1.5 text-left text-xs transition-colors flex items-center justify-between ${
+                        item.key === targetKey
+                          ? 'bg-[#EBF755] font-black text-black'
+                          : 'hover:bg-black/5 text-[#121417]'
                       }`}
-                      style={{ backgroundColor: c.hex }}
-                      title={c.name}
-                    />
+                    >
+                      <span className="truncate">{item.note.title || 'Untitled Note'}</span>
+                      {item.note.isPinned && <Pin className="w-2.5 h-2.5 fill-current ml-1 flex-shrink-0" />}
+                    </button>
                   ))}
                 </div>
               )}
             </div>
-          </div>
-
-          {/* Editor Content Area */}
-          <div 
-            className="flex-1 overflow-y-auto px-4 py-3 cursor-text" 
-            onClick={() => editor?.commands.focus()}
-          >
-            <EditorContent editor={editor} />
-          </div>
-
-          {/* Footer Info & Actions */}
-          <div className="p-3 border-t border-black/5 flex items-center justify-between text-[10px] text-[#121417]/60 font-medium bg-black/[0.01]">
-            <div className="flex items-center gap-1.5">
-              {isNoteSaving ? (
-                <>
-                  <Clock className="w-3 h-3 animate-pulse text-amber-500" />
-                  <span className="text-amber-600 font-bold">Saving changes...</span>
-                </>
-              ) : (
-                <>
-                  <Check className="w-3 h-3 text-emerald-500" />
-                  <span className="font-bold">{lastSavedTime ? `Saved ${lastSavedTime}` : 'All changes saved'}</span>
-                </>
-              )}
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button 
-                onClick={copyNotes} 
-                className="hover:text-black font-bold transition-colors flex items-center gap-1"
-                title="Copy note text to clipboard"
-              >
-                {copied ? (
-                  <>
-                    <Check className="w-3 h-3 text-emerald-600" />
-                    <span className="text-emerald-700">Copied!</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3 h-3" />
-                    <span>Copy</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </>
+          )}
+        </div>
       )}
+
+      {/* 2. Top Bar: Note Title, Pin, Delete, Close */}
+      <div className="p-3 sm:p-4 pb-2 flex flex-col gap-1 border-b border-black/5">
+        <div className="flex items-center justify-between gap-3">
+          <input 
+            type="text" 
+            value={note.title} 
+            onChange={handleTitleChange} 
+            placeholder="Note Title..."
+            className="flex-1 font-black text-sm sm:text-base bg-transparent border-none outline-none placeholder-[#121417]/40 text-[#121417]"
+          />
+          <div className="flex items-center gap-1.5">
+            {/* Pin note button */}
+            <button 
+              onClick={togglePin}
+              className={`p-1.5 rounded-full transition-all ${
+                note.isPinned 
+                  ? 'bg-[#121417] text-[#EBF755] shadow-xs scale-105' 
+                  : 'text-[#121417]/50 hover:bg-black/5 hover:text-[#121417]'
+              }`}
+              title={note.isPinned ? 'Unpin Note' : 'Pin Note'}
+            >
+              <Pin className={`w-4 h-4 ${note.isPinned ? 'fill-current' : ''}`} />
+            </button>
+
+            {/* Delete note button */}
+            {!isDirectKeyMode && (
+              <button
+                onClick={handleDeleteCurrentNote}
+                className="p-1.5 rounded-full text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                title="Delete note"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="p-1.5 rounded-full text-[#121417]/50 hover:bg-black/10 hover:text-[#121417] transition-colors"
+                title="Close Note"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Formatting Toolbar */}
+      <div className="px-3 sm:px-4 py-1.5 flex items-center justify-between gap-1.5 flex-wrap border-b border-black/5 bg-black/[0.02]">
+        <div className="flex items-center gap-1 flex-wrap">
+          {/* Interactive Video Timestamp Button */}
+          <button
+            onClick={handleInsertTimestamp}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-[#EBF755] hover:bg-[#E2EF43] text-black border border-[#121417]/20 shadow-xs transition-transform active:scale-95"
+            title="Insert current video timestamp (Alt + T)"
+          >
+            <Clock className="w-3 h-3" />
+            <span>Time</span>
+          </button>
+          
+          <div className="w-[1px] h-3.5 bg-[#121417]/15 mx-0.5" />
+
+          {editor && (
+            <>
+              {/* Text Size Selector Dropdown */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsSizeDropdownOpen(!isSizeDropdownOpen)}
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold text-[#121417]/80 hover:bg-black/10 transition-colors border border-black/10 bg-white/70 shadow-2xs"
+                  title="Text Size"
+                >
+                  <Type className="w-3 h-3 text-[#121417]/70" />
+                  <span>{getCurrentTextSizeLabel()}</span>
+                  <ChevronDown className="w-3 h-3 text-[#121417]/50" />
+                </button>
+
+                {isSizeDropdownOpen && (
+                  <div className="absolute left-0 top-full mt-1 bg-white border-2 border-[#121417] rounded-xl shadow-solid py-1 z-30 min-w-[130px] animate-fade-in">
+                    <button
+                      onClick={() => {
+                        editor.chain().focus().setParagraph().run();
+                        setIsSizeDropdownOpen(false);
+                      }}
+                      className={`w-full px-3 py-1.5 text-left text-xs font-medium hover:bg-[#EBF755] transition-colors ${
+                        !editor.isActive('heading') ? 'font-black bg-[#EBF755]/50 text-black' : 'text-[#121417]'
+                      }`}
+                    >
+                      Normal Text
+                    </button>
+                    <button
+                      onClick={() => {
+                        editor.chain().focus().toggleHeading({ level: 1 }).run();
+                        setIsSizeDropdownOpen(false);
+                      }}
+                      className={`w-full px-3 py-1.5 text-left text-sm font-black hover:bg-[#EBF755] transition-colors ${
+                        editor.isActive('heading', { level: 1 }) ? 'bg-[#EBF755]/50 text-black' : 'text-[#121417]'
+                      }`}
+                    >
+                      Large (H1)
+                    </button>
+                    <button
+                      onClick={() => {
+                        editor.chain().focus().toggleHeading({ level: 2 }).run();
+                        setIsSizeDropdownOpen(false);
+                      }}
+                      className={`w-full px-3 py-1.5 text-left text-xs font-bold hover:bg-[#EBF755] transition-colors ${
+                        editor.isActive('heading', { level: 2 }) ? 'bg-[#EBF755]/50 text-black' : 'text-[#121417]'
+                      }`}
+                    >
+                      Medium (H2)
+                    </button>
+                    <button
+                      onClick={() => {
+                        editor.chain().focus().toggleHeading({ level: 3 }).run();
+                        setIsSizeDropdownOpen(false);
+                      }}
+                      className={`w-full px-3 py-1.5 text-left text-[11px] font-bold hover:bg-[#EBF755] transition-colors ${
+                        editor.isActive('heading', { level: 3 }) ? 'bg-[#EBF755]/50 text-black' : 'text-[#121417]'
+                      }`}
+                    >
+                      Small (H3)
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Bold */}
+              <button
+                onClick={() => editor.chain().focus().toggleBold().run()}
+                className={`p-1.5 rounded-lg text-[#121417]/80 hover:bg-black/10 transition-colors ${
+                  editor.isActive('bold') ? 'bg-[#121417] text-[#EBF755] shadow-2xs font-bold' : ''
+                }`}
+                title="Bold (Ctrl+B)"
+              >
+                <Bold className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Italic */}
+              <button
+                onClick={() => editor.chain().focus().toggleItalic().run()}
+                className={`p-1.5 rounded-lg text-[#121417]/80 hover:bg-black/10 transition-colors ${
+                  editor.isActive('italic') ? 'bg-[#121417] text-[#EBF755] shadow-2xs font-bold' : ''
+                }`}
+                title="Italic (Ctrl+I)"
+              >
+                <Italic className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Strikethrough */}
+              <button
+                onClick={() => editor.chain().focus().toggleStrike().run()}
+                className={`p-1.5 rounded-lg text-[#121417]/80 hover:bg-black/10 transition-colors ${
+                  editor.isActive('strike') ? 'bg-[#121417] text-[#EBF755] shadow-2xs font-bold' : ''
+                }`}
+                title="Strikethrough"
+              >
+                <Strikethrough className="w-3.5 h-3.5" />
+              </button>
+
+              <div className="w-[1px] h-3.5 bg-[#121417]/15 mx-0.5" />
+
+              {/* Bullet Points */}
+              <button
+                onClick={() => editor.chain().focus().toggleBulletList().run()}
+                className={`p-1.5 rounded-lg text-[#121417]/80 hover:bg-black/10 transition-colors ${
+                  editor.isActive('bulletList') ? 'bg-[#121417] text-[#EBF755] shadow-2xs font-bold' : ''
+                }`}
+                title="Bullet Points"
+              >
+                <List className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Interactive Checkboxes / Task List */}
+              <button
+                onClick={() => editor.chain().focus().toggleTaskList().run()}
+                className={`p-1.5 rounded-lg text-[#121417]/80 hover:bg-black/10 transition-colors ${
+                  editor.isActive('taskList') ? 'bg-[#121417] text-[#EBF755] shadow-2xs font-bold' : ''
+                }`}
+                title="Checklist / Tasks"
+              >
+                <ListTodo className="w-3.5 h-3.5" />
+              </button>
+            </>
+          )}
+        </div>
+        
+        {/* Background Color Palette Picker */}
+        <div className="relative">
+          <button 
+            type="button"
+            onClick={() => setIsPaletteOpen(!isPaletteOpen)}
+            className="p-1.5 rounded-lg text-[#121417]/60 hover:bg-black/10 hover:text-[#121417] transition-colors"
+            title="Note Background Color"
+          >
+            <Palette className="w-3.5 h-3.5" />
+          </button>
+
+          {isPaletteOpen && (
+            <div className="absolute right-0 top-full mt-1 flex flex-wrap gap-1.5 bg-white p-2 rounded-2xl shadow-solid-lg border-2 border-[#121417] z-40 w-44 animate-fade-in">
+              {PRESET_NOTE_COLORS.map(c => (
+                <button
+                  key={c.hex}
+                  onClick={() => changeColor(c.hex)}
+                  className={`w-6 h-6 rounded-full border-2 border-black/20 hover:scale-110 transition-transform ${
+                    (note.color || '#ffffff') === c.hex ? 'ring-2 ring-[#121417] scale-105' : ''
+                  }`}
+                  style={{ backgroundColor: c.hex }}
+                  title={c.name}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 4. Editor Content Area */}
+      <div 
+        className="flex-1 overflow-y-auto px-4 py-3 cursor-text" 
+        onClick={() => editor?.commands.focus()}
+      >
+        <EditorContent editor={editor} />
+      </div>
+
+      {/* 5. Footer Info & Actions */}
+      <div className="p-3 border-t border-black/5 flex items-center justify-between text-[10px] text-[#121417]/60 font-medium bg-black/[0.01]">
+        <div className="flex items-center gap-1.5">
+          {isNoteSaving ? (
+            <>
+              <Clock className="w-3 h-3 animate-pulse text-amber-500" />
+              <span className="text-amber-600 font-bold">Saving changes...</span>
+            </>
+          ) : (
+            <>
+              <Check className="w-3 h-3 text-emerald-500" />
+              <span className="font-bold">{lastSavedTime ? `Saved ${lastSavedTime}` : 'All changes saved'}</span>
+            </>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={copyNotes} 
+            className="hover:text-black font-bold transition-colors flex items-center gap-1"
+            title="Copy note text to clipboard"
+          >
+            {copied ? (
+              <>
+                <Check className="w-3 h-3 text-emerald-600" />
+                <span className="text-emerald-700">Copied!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3 h-3" />
+                <span>Copy</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
